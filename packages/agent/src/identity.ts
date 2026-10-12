@@ -7,6 +7,9 @@ export interface AgentIdentity {
   signingKey: SigningKey;
 }
 
+/** The agent's registered redirect URI (agent.json `redirect_uris`, briefing 9.4). */
+export const redirectUriFor = (clientId: string): string => `${new URL(clientId).origin}/oauth/callback`;
+
 export async function loadIdentity(clientId: string, privateJwk: JWK): Promise<AgentIdentity> {
   if (!privateJwk.kid) throw new Error("signing key needs a kid");
   const privateKey = await importJWK(privateJwk, "ES256") as CryptoKey;

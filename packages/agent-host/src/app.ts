@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { JWK } from "jose";
+import { callbackRoutes } from "./callback.ts";
 
 export interface AgentHostConfig {
   /** The public origin of the agent host, e.g. https://agent.ohare.id.au */
@@ -33,5 +34,6 @@ export function createAgentHost(c: AgentHostConfig): Hono {
   const app = new Hono();
   app.get("/agent.json", (ctx) => ctx.json(agentJson(c)));
   app.get("/jwks.json", (ctx) => ctx.json({ keys: c.publicJwks }));
+  app.route("/", callbackRoutes());
   return app;
 }

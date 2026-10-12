@@ -1,16 +1,51 @@
 // The personal agent CLI. Narrated protocol events go to stderr; results go to stdout.
+import { createInterface } from "node:readline";
 import { PoppyError } from "poppy-core";
 import type { CompanyClient } from "./company.ts";
 import { agentConfigFromEnv, clientFromConfig } from "./config.ts";
+import { startLoopback } from "./loopback.ts";
+
+export const DEFAULT_SCOPES = ["poppy:read", "poppy:write", "standings"];
+
+/** Hooks for the parts of sign-in that involve the user, replaced in tests. */
+export interface CliIo {
+  out: (s: string) => void;
+  /** Tells the user to open the URL. The user signs in themselves (spec 4.4). */
+  showSignInUrl: (url: string) => void;
+  /** A callback URL pasted by the user, as a fallback if the loopback hop is blocked (S3). */
+  pastedCallback?: () => Promise<string>;
+}
+
+function stdinLine(prompt: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  return new Promise((resolve) => rl.question(prompt, (a) => { rl.close(); resolve(a.trim()); }));
+}
+
+async function signIn(client: CompanyClient, scopes: string[], io: CliIo) {
+  const lb = await startLoopback();
+  try {
+    io.showSignInUrl(await client.beginSignIn(scopes, { loopbackPort: lb.port }));
+    const waits: Promise<string | URLSearchParams>[] = [lb.result];
+    if (io.pastedCallback) waits.push(io.pastedCallback());
+    return await client.completeSignIn(await Promise.race(waits));
+  } finally {
+    lb.close();
+  }
+}
 
 export const USAGE = `usage: agent <command>
   discover                 fetch and check the company's Poppy documents
   session                  start a signed-out Session
   fixtures [round]         GET /api/fixtures
   ladder                   GET /api/ladder
+  signin [scope ...]       Direct Sign-In in your browser (default: all scopes)
+  status                   show the Session and whether an Account Token is stored
   call METHOD PATH [JSON]  call any API path`;
 
-export async function runCli(argv: string[], client: CompanyClient, out: (s: string) => void): Promise<number> {
+export async function runCli(argv: string[], client: CompanyClient, ioOrOut: CliIo | ((s: string) => void)): Promise<number> {
+  const io: CliIo = typeof ioOrOut === "function"
+    ? { out: ioOrOut, showSignInUrl: (u) => ioOrOut(`Open this URL to sign in: ${u}`) } : ioOrOut;
+  const out = io.out;
   const [cmd, ...args] = argv;
   const print = (v: unknown) => out(JSON.stringify(v, null, 2));
   const show = (r: { status: number; body: unknown; error?: string }) => {
@@ -33,6 +68,17 @@ export async function runCli(argv: string[], client: CompanyClient, out: (s: str
       return show(await client.call("GET", args[0] ? `/api/fixtures?round=${encodeURIComponent(args[0])}` : "/api/fixtures"));
     case "ladder":
       return show(await client.call("GET", "/api/ladder"));
+    case "signin": {
+      const s = await signIn(client, args.length ? args : DEFAULT_SCOPES, io);
+      print({ signed_in: s.signedIn, session_id: s.sessionId, scope: s.scope });
+      return 0;
+    }
+    case "status": {
+      const at = await client.accountToken();
+      print({ session: client.session ? { session_id: client.session.sessionId, signed_in: client.session.signedIn,
+        scope: client.session.scope } : null, account_token: at ? { stored: true, scope: at.scope } : { stored: false } });
+      return 0;
+    }
     case "call": {
       const [method, path, body] = args;
       if (!method || !path) break;
@@ -46,7 +92,13 @@ export async function runCli(argv: string[], client: CompanyClient, out: (s: str
 if (import.meta.main) {
   try {
     const client = await clientFromConfig(agentConfigFromEnv());
-    process.exitCode = await runCli(process.argv.slice(2), client, (s) => console.log(s));
+    process.exitCode = await runCli(process.argv.slice(2), client, {
+      out: (s) => console.log(s),
+      showSignInUrl: (u) => console.error(`\nOpen this URL in your browser and sign in:\n\n  ${u}\n`),
+      pastedCallback: process.stdin.isTTY
+        ? () => stdinLine("(If the browser can't reach this terminal, paste the final URL here) ") : undefined,
+    });
+    process.exit();
   } catch (e) {
     console.error(e instanceof PoppyError ? `error: ${e.message}` : e);
     process.exitCode = 1;

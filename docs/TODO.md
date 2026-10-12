@@ -239,13 +239,15 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Description:** The token endpoint handles `authorization_code` with the verifier, `session_id`, client assertion and DPoP proof. It signs in that Session and returns an Account Token plus the signed-in token. The agent builds the authorize URL (PKCE and `state`), opens the browser, and receives the code via the agent-host callback (handed to the CLI over a local loopback or a short poll). It checks `state` and `iss` (F9) and stores the Account Token in the vault.
 
 **Acceptance criteria:**
-- [ ] A code works once only, only with the right verifier, client, redirect URI and `session_id` (a Session of the same `client_id`). The new Session Token is bound to the key in the exchange request's proof (spec 4.3, S4 E1).
-- [ ] The agent rejects a callback with a wrong `state` or `iss`, handles `error=access_denied`, and warns when the granted `scope` is narrower than requested.
-- [ ] The Account Token **and the per-company DPoP private keys** are stored encrypted at rest (OS keychain, or a file encrypted with a local key) and never printed (S5 F2).
+- [x] A code works once only, only with the right verifier, client, redirect URI and `session_id` (a Session of the same `client_id`). The new Session Token is bound to the key in the exchange request's proof (spec 4.3, S4 E1).
+- [x] The agent rejects a callback with a wrong `state` or `iss`, handles `error=access_denied`, and warns when the granted `scope` is narrower than requested.
+- [x] The Account Token **and the per-company DPoP private keys** are stored encrypted at rest (OS keychain, or a file encrypted with a local key) and never printed (S5 F2).
 
 **Verification:**
-- [ ] The acceptance script extends to: sign-in using form automation in `scripts/`, playing the test user (never the agent library; S4 E4).
-- [ ] `gate-verify` is green.
+- [x] The acceptance script extends to: sign-in using form automation in `scripts/`, playing the test user (never the agent library; S4 E4).
+- [x] `gate-verify` is green.
+
+*Done 12 Oct, ahead of S3.* The agent host's callback page **POSTs** the result to the CLI's loopback listener (S3's `form-post` variant), with the port carried in `state` as `<nonce>.<port>`. The CLI also accepts a **pasted** callback URL, so sign-in still works if a browser blocks the loopback hop. If S3 shows that browsers block or prompt, the only change is which variant the callback page uses (or the poll fallback). Form automation lives in `test-support/browser.ts`, which plays the user.
 
 **Dependencies:** 7, 5
 **Files:** `packages/company/src/token.ts`, `packages/agent/src/{signin,vault}.ts`, `packages/agent-host/src/callback.ts`, `scripts/acceptance.ts`

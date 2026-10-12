@@ -1,8 +1,11 @@
 // One company, from the agent's side: discovery, Session, API calls (and later sign-in).
-import { clientAssertion, dpopProof, PoppyError, sessionAssertion, silentLogger, type DpopKey, type Logger } from "poppy-core";
+import {
+  clientAssertion, dpopProof, pkceChallenge, pkceVerifier, PoppyError, rid, sessionAssertion, silentLogger,
+  type DpopKey, type Logger,
+} from "poppy-core";
 import { discover, type Discovery } from "./discover.ts";
 import type { Fetch } from "./http.ts";
-import type { AgentIdentity } from "./identity.ts";
+import { redirectUriFor, type AgentIdentity } from "./identity.ts";
 import { dpopKeyFor, userIdFor } from "./userIds.ts";
 import type { Vault } from "./vault.ts";
 import { parseWwwAuthenticate } from "./wwwAuth.ts";
@@ -28,6 +31,19 @@ export interface SessionState {
   signedIn: boolean;
   scope: string[];
   expiresAt: number;
+}
+
+export interface PendingSignIn {
+  state: string;
+  verifier: string;
+  redirectUri: string;
+  scopes: string[];
+  issuer: string;
+}
+
+export interface StoredAccountToken {
+  token: string;
+  scope: string[];
 }
 
 export interface CallResult {
@@ -60,6 +76,8 @@ export class CompanyClient {
   protected readonly d: Required<AgentDeps>;
   discovery: Discovery | undefined;
   session: SessionState | undefined;
+  /** The sign-in in progress, if any. */
+  pendingSignIn: PendingSignIn | undefined;
   /** DPoP nonces by origin (the token endpoint and APIs may differ). */
   private nonces = new Map<string, string>();
 
@@ -226,4 +244,76 @@ export class CompanyClient {
 
   /** Hook for subclasses: get a new token after invalid_token (Task 10 uses the Account Token). */
   protected async onInvalidToken(): Promise<void> {}
+
+  private accountKey = async () => `account_token:${await this.issuer()}`;
+
+  async accountToken(): Promise<StoredAccountToken | undefined> {
+    const v = await this.d.vault.get(await this.accountKey());
+    return v ? JSON.parse(v) as StoredAccountToken : undefined;
+  }
+
+  protected async saveAccountToken(t: StoredAccountToken): Promise<void> {
+    await this.d.vault.set(await this.accountKey(), JSON.stringify(t));
+  }
+
+  protected async forgetAccountToken(): Promise<void> {
+    await this.d.vault.delete(await this.accountKey());
+  }
+
+  /**
+   * Starts Direct Sign-In (spec 4.5): makes sure there's a Session, then builds the authorize URL
+   * with PKCE (S256) and a fresh `state`. The user opens the URL and signs in themselves (spec 4.4).
+   * `loopbackPort` is carried in `state` so the agent host's callback page can find the CLI.
+   */
+  async beginSignIn(scopes: string[], opts: { loopbackPort?: number } = {}): Promise<string> {
+    const { metadata } = await this.discovered();
+    await this.ensureSession();
+    const state = opts.loopbackPort ? `${rid()}.${opts.loopbackPort}` : rid();
+    const verifier = pkceVerifier();
+    const redirectUri = redirectUriFor(this.d.identity.clientId);
+    this.pendingSignIn = { state, verifier, redirectUri, scopes, issuer: metadata.issuer };
+    const u = new URL(metadata.authorization_endpoint);
+    u.search = new URLSearchParams({
+      response_type: "code", client_id: this.d.identity.clientId, redirect_uri: redirectUri, scope: scopes.join(" "),
+      state, code_challenge: pkceChallenge(verifier), code_challenge_method: "S256",
+    }).toString();
+    this.d.log.event("signin.started", { company: metadata.issuer, scope: scopes.join(" ") });
+    return u.toString();
+  }
+
+  /**
+   * Finishes Direct Sign-In with the callback's parameters. Checks `state` and `iss` (F9, RFC 9207)
+   * before sending anything, exchanges the code for an Account Token and a signed-in Session Token,
+   * and stores the Account Token in the vault.
+   */
+  async completeSignIn(callback: string | URLSearchParams): Promise<SessionState> {
+    const p = typeof callback === "string" ? new URL(callback).searchParams : callback;
+    const pending = this.pendingSignIn;
+    this.pendingSignIn = undefined;
+    const abort = (code: string, detail: string) => {
+      this.d.log.event("signin.aborted", { reason: code, detail });
+      return new PoppyError(code, 0, detail);
+    };
+    if (!pending) throw abort("no_signin_pending", "no sign-in in progress");
+    if (p.get("state") !== pending.state) throw abort("state_mismatch", "state does not match (A-15)");
+    if (p.get("iss") !== pending.issuer) throw abort("iss_mismatch", `iss ${p.get("iss")} is not ${pending.issuer} (A-05)`);
+    const error = p.get("error");
+    if (error) throw abort(error, p.get("error_description") ?? "the company returned an error");
+    const code = p.get("code");
+    if (!code) throw abort("invalid_callback", "no code");
+
+    const sessionId = (await this.ensureSession()).sessionId;
+    const t = await this.tokenRequest(async () => ({
+      grant_type: "authorization_code", code, redirect_uri: pending.redirectUri, code_verifier: pending.verifier,
+      session_id: sessionId,
+    }));
+    if (!t.refresh_token) throw new PoppyError("invalid_token_response", 0, "no Account Token in the response");
+    if (t.session_id !== sessionId) throw new PoppyError("invalid_token_response", 0, "session_id changed");
+    const s = this.adoptToken(t);
+    await this.saveAccountToken({ token: t.refresh_token, scope: s.scope });
+    const missing = pending.scopes.filter((x) => !s.scope.includes(x));
+    if (missing.length) this.d.log.event("signin.scope_narrowed", { missing: missing.join(" ") });
+    this.d.log.event("signin.complete", { company: pending.issuer, session_id: s.sessionId, scope: s.scope.join(" ") });
+    return s;
+  }
 }
