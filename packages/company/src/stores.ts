@@ -65,6 +65,8 @@ export interface Table<T> {
   delete(id: string): Promise<void>;
   /** Reads and deletes in one step, so only one caller ever gets the item (codes, A-40). */
   take(id: string): Promise<T | undefined>;
+  /** Puts only if there's no live item with this id. Returns false if there was one. */
+  create(id: string, value: T, expiresAt?: number): Promise<boolean>;
 }
 
 export interface SessionTable extends Table<Session> {
@@ -116,6 +118,12 @@ export class MemoryTable<T> implements Table<T> {
     const v = await this.get(id);
     this.items.delete(id);
     return v;
+  }
+
+  async create(id: string, value: T, expiresAt?: number): Promise<boolean> {
+    if (await this.get(id) !== undefined) return false;
+    await this.put(id, value, expiresAt);
+    return true;
   }
 }
 

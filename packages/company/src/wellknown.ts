@@ -13,6 +13,7 @@ export function poppyJson(c: ResolvedConfig) {
       custom_scopes: c.customScopes,
     },
     apis: [{ type: "openapi", url: `${c.baseUrl}/openapi.json`, description: c.apiDescription }],
+    agent: { protocols: [{ type: "poppy", endpoint: `${c.baseUrl}/conversations` }] },
   };
 }
 

@@ -1,0 +1,7 @@
+# DynamoDB Local for gate-verify (harness mockAws: dynamodb-local) and npm run test:dynamo.
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    command: ["-jar", "DynamoDBLocal.jar", "-inMemory", "-sharedDb"]
+    ports:
+      - "8000:8000"

@@ -13,6 +13,7 @@ export default defineConfig({
       { find: /^poppy-core$/, replacement: src("poppy-core/src/index.ts") },
       { find: /^company$/, replacement: src("company/src/index.ts") },
       { find: /^company\/server$/, replacement: src("company/src/server.ts") },
+      { find: /^company\/dynamo$/, replacement: src("company/src/stores/dynamo.ts") },
       { find: /^agent-host$/, replacement: src("agent-host/src/index.ts") },
       { find: /^agent-host\/server$/, replacement: src("agent-host/src/server.ts") },
       { find: /^agent$/, replacement: src("agent/src/index.ts") },

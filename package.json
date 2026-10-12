@@ -21,7 +21,8 @@
     "mutation": "stryker run",
     "agent:local": "POPPY_DEV_ALLOW_HTTP_LOCALHOST=1 node packages/agent/src/cli.ts",
     "chat": "node packages/agent/src/chat-cli.ts",
-    "chat:local": "POPPY_DEV_ALLOW_HTTP_LOCALHOST=1 node packages/agent/src/chat-cli.ts"
+    "chat:local": "POPPY_DEV_ALLOW_HTTP_LOCALHOST=1 node packages/agent/src/chat-cli.ts",
+    "test:dynamo": "POPPY_STORES=dynamo DYNAMODB_ENDPOINT=${DYNAMODB_ENDPOINT:-http://localhost:8000} vitest run"
   },
   "devDependencies": {
     "@langchain/core": "1.2.13",

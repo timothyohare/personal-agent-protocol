@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { meApi } from "./api/me.ts";
 import { publicApi } from "./api/public.ts";
+import { conversationRoutes } from "./conversations/routes.ts";
+import { ConversationService, type CompanyAgent } from "./conversations/service.ts";
+import { memoryConversationStores, type ConversationStores } from "./conversations/store.ts";
 import { authorizeRoutes } from "./authorize.ts";
 import { requireSessionToken, type AuthEnv } from "./middleware.ts";
 import { openApi } from "./openapi.ts";
@@ -17,6 +20,7 @@ export interface Company {
   app: Hono;
   config: ResolvedConfig;
   stores: Stores;
+  conversations: ConversationService;
 }
 
 export interface CompanyOptions {
@@ -25,6 +29,11 @@ export interface CompanyOptions {
   tokenRateLimit?: number;
   /** Password attempts per minute per sign-in request. */
   loginRateLimit?: number;
+  conversationStores?: ConversationStores;
+  /** The company agent behind the conversation API (default: a scripted echo). */
+  companyAgent?: CompanyAgent;
+  /** How company-agent jobs run (default: in-process, straight away). */
+  scheduleAgent?: (job: () => Promise<void>) => void;
 }
 
 export function createCompany(config: CompanyConfig, opts: CompanyOptions = {}): Company {
@@ -48,8 +57,14 @@ export function createCompany(config: CompanyConfig, opts: CompanyOptions = {}):
 
   const api = new Hono<AuthEnv>();
   api.use("/api/*", requireSessionToken(c, stores, deps.nonces));
+  api.use("/conversations", requireSessionToken(c, stores, deps.nonces));
+  api.use("/conversations/*", requireSessionToken(c, stores, deps.nonces));
   api.route("/", publicApi());
   api.route("/", meApi(stores));
+  const conversations = new ConversationService(opts.conversationStores ?? memoryConversationStores(),
+    { log: c.log, ...(opts.companyAgent ? { agent: opts.companyAgent } : {}),
+      ...(opts.scheduleAgent ? { schedule: opts.scheduleAgent } : {}) });
+  api.route("/", conversationRoutes(conversations));
   app.route("/", api);
-  return { app, config: c, stores };
+  return { app, config: c, stores, conversations };
 }
