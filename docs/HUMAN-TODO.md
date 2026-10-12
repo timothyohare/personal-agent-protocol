@@ -10,7 +10,7 @@ When an item is done, tick it and add the date. If it changes the plan, add a li
 |---|---|---|---|
 | [x] | Decide on version control: `git init` here, and whether to push to a GitHub remote (private or public) | Task 1 | **Done 12 Oct 2026:** repo created private, then made **public** the same day: https://github.com/timothyohare/personal-agent-protocol, branch `main`. `.gitignore` excludes keys, vaults, `.env*` and `spikes/`. |
 | [x] | Install Node.js LTS and npm | Task 1 | **Done 12 Oct 2026:** Node v24.15.0 (LTS) and npm 11.12.1 were already installed. The plan now targets Node 24. |
-| [ ] | Install Docker (for DynamoDB Local, used from Task 13) | Task 13 | Needed by `gate-verify` once `mockAws: dynamodb-local` is set |
+| [x] | Install Docker (for DynamoDB Local, used from Task 13) | Task 13 | **Done 12 Oct 2026:** Docker 27.0.3 installed. The daemon runs containers without sudo (`hello-world` passed). |
 | [ ] | **Spike S3:** run the callback redirect test page in Chrome, Firefox and Safari | Task 8 | Claude builds the test page, and you click through it in each browser and report what happens. Safari needs a Mac or iPhone. If you don't have one, say so and the spike records Safari as untested. |
 | [ ] | Review the spike notes for S3, S4 and S5 in `docs/spikes/` | Checkpoint 0 | Approve any plan changes the spikes recommend |
 
