@@ -1,0 +1,32 @@
+{
+  "name": "personal-agent-protocol",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.build.json",
+    "dev:local": "node scripts/dev-local.ts",
+    "acceptance": "node scripts/acceptance.ts",
+    "attacks": "node scripts/attacks.ts",
+    "genkeys": "node scripts/genkeys.ts",
+    "agent": "node packages/agent/src/cli.ts",
+    "mutation": "stryker run"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
+    "@types/node": "24.19.2",
+    "eslint": "10.11.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.1",
+    "vitest": "5.0.2"
+  }
+}
