@@ -11,7 +11,7 @@ When an item is done, tick it and add the date. If it changes the plan, add a li
 | [x] | Decide on version control: `git init` here, and whether to push to a GitHub remote (private or public) | Task 1 | **Done 12 Oct 2026:** repo created private, then made **public** the same day: https://github.com/timothyohare/personal-agent-protocol, branch `main`. `.gitignore` excludes keys, vaults, `.env*` and `spikes/`. |
 | [x] | Install Node.js LTS and npm | Task 1 | **Done 12 Oct 2026:** Node v24.15.0 (LTS) and npm 11.12.1 were already installed. The plan now targets Node 24. |
 | [x] | Install Docker (for DynamoDB Local, used from Task 13) | Task 13 | **Done 12 Oct 2026:** Docker 27.0.3 installed. The daemon runs containers without sudo (`hello-world` passed). |
-| [ ] | **Spike S3:** run the callback redirect test page in Chrome, Firefox and Safari | Task 8 | Claude builds the test page, and you click through it in each browser and report what happens. Safari needs a Mac or iPhone. If you don't have one, say so and the spike records Safari as untested. |
+| [ ] | **Spike S3:** run the callback redirect test in Chrome, Firefox and Safari | Task 8 | The test pages are live. Run `node spikes/S3-callback/listener.mjs https://timothyohare.github.io/personal-agent-protocol/s3/`, open the printed URL in each browser, click all 4 links, and note any prompt or warning. Steps are in [S3-callback.md](spikes/S3-callback.md). Safari needs a Mac. If you don't have one, say so and the spike records Safari as untested. |
 | [ ] | Review the spike notes for S3, S4 and S5 in `docs/spikes/` | Checkpoint 0 | Approve any plan changes the spikes recommend |
 
 ## v1 (Tasks 1–12)
@@ -62,3 +62,4 @@ When an item is done, tick it and add the date. If it changes the plan, add a li
 | [ ] | Check the Poppy spec for new drafts (personalagentprotocol.org) about every two weeks | Draft 0.1 allows breaking changes. Tell Claude when it changes, so the briefing and S4 checklist can be updated. |
 | [ ] | Approve or reject each spike's fallback when a spike fails | Recorded in the TODO.md decisions log |
 | [ ] | Tear down the AWS stack (`sam delete`) when the demo is no longer needed | Avoids ongoing cost and an abandoned public endpoint |
+| [ ] | After S3, unpublish the test pages: `git push origin --delete gh-pages` | Claude can do this when you say S3 is finished |
