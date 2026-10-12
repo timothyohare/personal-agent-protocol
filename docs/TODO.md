@@ -220,13 +220,13 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Description:** `GET /oauth/authorize` validates `client_id` (via `verifyAgent`), checks that `redirect_uri` exactly matches the metadata, requires `code_challenge_method=S256`, and shows a login form. Next it shows a consent page with `client_name`, the `client_id` host and a checkbox per scope. It issues a single-use code (60 s) bound to the client, redirect URI, challenge, granted scopes and user, then redirects with `code`, `state` and `iss`.
 
 **Acceptance criteria:**
-- [ ] Mismatched `redirect_uri` and missing or `plain` PKCE are refused, *without* redirecting to the bad URI.
-- [ ] The forms carry CSRF tokens. Pages send `X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors 'none'`.
-- [ ] Unticking a scope leaves it out of the issued code.
-- [ ] A missing, unknown or unavailable `scope` gives `invalid_scope` (A-44). Declining redirects with `error=access_denied` plus `iss` (S4 G3, G4).
+- [x] Mismatched `redirect_uri` and missing or `plain` PKCE are refused, *without* redirecting to the bad URI.
+- [x] The forms carry CSRF tokens. Pages send `X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors 'none'`.
+- [x] Unticking a scope leaves it out of the issued code.
+- [x] A missing, unknown or unavailable `scope` gives `invalid_scope` (A-44). Declining redirects with `error=access_denied` plus `iss` (S4 G3, G4).
 
 **Verification:**
-- [ ] Integration tests drive the forms over HTTP.
+- [x] Integration tests drive the forms over HTTP.
 - [ ] Manual: the consent page renders in a browser.
 
 **Dependencies:** 4

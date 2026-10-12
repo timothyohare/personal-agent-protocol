@@ -1,5 +1,7 @@
 // Company state. In-memory maps behind interfaces, so DynamoDB can replace them (Task 13).
 import { MemoryReplayStore, rid, type ReplayStore } from "poppy-core";
+import type { PendingAuthz } from "./authorize.ts";
+import { DEFAULT_TEST_USER, makeUser, type User } from "./users.ts";
 
 export interface Session {
   id: string;
@@ -53,6 +55,10 @@ export interface Stores {
   codes: Map<string, AuthCode>;
   /** Keyed by the refresh token value. */
   accountTokens: Map<string, AccountToken>;
+  /** Sign-in requests between the authorize redirect and consent. */
+  pending: Map<string, PendingAuthz>;
+  /** Keyed by username. */
+  users: Map<string, User>;
 }
 
 export function memoryStores(): Stores {
@@ -62,6 +68,8 @@ export function memoryStores(): Stores {
     tokens: new Map(),
     codes: new Map(),
     accountTokens: new Map(),
+    pending: new Map(),
+    users: new Map([[DEFAULT_TEST_USER.username, makeUser(DEFAULT_TEST_USER.username, DEFAULT_TEST_USER.password)]]),
   };
 }
 

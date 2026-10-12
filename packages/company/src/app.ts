@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { publicApi } from "./api/public.ts";
+import { authorizeRoutes } from "./authorize.ts";
 import { requireSessionToken, type AuthEnv } from "./middleware.ts";
 import { openApi } from "./openapi.ts";
 import { resolveConfig, type CompanyConfig, type ResolvedConfig } from "./config.ts";
@@ -19,6 +20,8 @@ export interface CompanyOptions {
   stores?: Stores;
   /** Token-endpoint requests per minute per client IP. */
   tokenRateLimit?: number;
+  /** Password attempts per minute per sign-in request. */
+  loginRateLimit?: number;
 }
 
 export function createCompany(config: CompanyConfig, opts: CompanyOptions = {}): Company {
@@ -32,6 +35,7 @@ export function createCompany(config: CompanyConfig, opts: CompanyOptions = {}):
   };
   const app = new Hono();
   app.route("/", wellKnownRoutes(c));
+  app.route("/", authorizeRoutes({ ...deps, loginLimiter: new RateLimiter(opts.loginRateLimit ?? 10) }));
   app.route("/", tokenRoutes(deps));
   app.get("/openapi.json", (ctx) => ctx.json(openApi(c)));
 
