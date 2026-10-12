@@ -161,15 +161,15 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Description:** The company's `verifyAgent` fetches and validates the client metadata, with SSRF guards. The token endpoint handles `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer` with the client assertion, session assertion and DPoP proof, and returns the spec 4.2 response. The agent's `startSession()` creates or reuses the per-issuer User ID (F2).
 
 **Acceptance criteria:**
-- [ ] The response body matches spec 4.2 exactly, with `signed_in: false` and `scope: ""`.
-- [ ] The session record stores `session_id`, `client_id`, user ID, account = none and the DPoP thumbprint.
-- [ ] Rejections: `client_id` not HTTPS (unless the dev flag is set), metadata `client_id` mismatch, `jwks_uri` on a different host, a reused assertion `jti`, a missing DPoP proof. Token-endpoint DPoP failures return **400** `invalid_dpop_proof` / `use_dpop_nonce` (S4 E3). The same-host check is deliberately stricter than the spec's same-domain rule (S4 notes).
-- [ ] Session **renewal**: the same grant with `session_id` returns a new signed-out token for that Session. It returns `invalid_session` if the Session ended or belongs to another `client_id` or User ID (S4 G1).
-- [ ] The agent retries once on `use_dpop_nonce` with the `DPoP-Nonce` value, and honours 429 `Retry-After` (S4 G5, G6).
+- [x] The response body matches spec 4.2 exactly, with `signed_in: false` and `scope: ""`.
+- [x] The session record stores `session_id`, `client_id`, user ID, account = none and the DPoP thumbprint.
+- [x] Rejections: `client_id` not HTTPS (unless the dev flag is set), metadata `client_id` mismatch, `jwks_uri` on a different host, a reused assertion `jti`, a missing DPoP proof. Token-endpoint DPoP failures return **400** `invalid_dpop_proof` / `use_dpop_nonce` (S4 E3). The same-host check is deliberately stricter than the spec's same-domain rule (S4 notes).
+- [x] Session **renewal**: the same grant with `session_id` returns a new signed-out token for that Session. It returns `invalid_session` if the Session ended or belongs to another `client_id` or User ID (S4 G1).
+- [x] The agent retries once on `use_dpop_nonce` with the `DPoP-Nonce` value, and honours 429 `Retry-After` (S4 G5, G6).
 
 **Verification:**
-- [ ] Integration test: agent → company in-process returns a Session Token.
-- [ ] `gate-ci` is green.
+- [x] Integration test: agent → company in-process returns a Session Token.
+- [x] `gate-ci` is green.
 
 **Dependencies:** 3
 **Files:** `packages/company/src/{verifyAgent,token,stores}.ts`, `packages/agent/src/{session,userIds}.ts`, tests
@@ -634,3 +634,4 @@ The tools reuse the page's existing fetch code (roughly 30 lines). Add `Permissi
 | 12 Oct 2026 | **Spike S5 done** ([note](spikes/S5-jose-dpop.md)). `jose` 6.2.12 covers DPoP, with 19 tests passing and every check proven by deletion. Applied: ESM plus `erasableSyntaxOnly` (Task 1), replay-last order and `jti` length (Task 2), `dpop_signing_alg_values_supported` (Task 3), DPoP keys in the vault (Task 8). |
 | 12 Oct 2026 | **Spike S4 done** ([note](spikes/S4-spec-checklist.md)). Fixed 4 errors (the Account Token isn't bound to the DPoP key; `invalid_session` for a foreign `session_id`; token-endpoint DPoP errors are 400; sign-in automation stays in the harness) and closed 13 gaps in Tasks 3–10, 16 and 20. Added attacks A-42 to A-46. |
 | 12 Oct 2026 | **Tasks 1 and 2 done** (overnight run, Checkpoint 0/A reviews deferred to Tim). Pinned **Vitest 4.1.11, not 5**: Stryker 10.0.0's Vitest runner never sees mutants killed under Vitest 5 (every DPoP mutant "survived", although the tests fail when the mutant is switched on by hand). TypeScript is pinned at 6.0.3 because `typescript-eslint` doesn't support TS 7 yet. Scripts run with plain `node` (S5 F1), so `tsx` isn't needed. `poppy-core` mutation score: 96.2%. |
+| 12 Oct 2026 | **Tasks 3 and 4 done.** Pulled the agent vault forward from Task 8, because Task 4 already needs per-issuer User IDs and DPoP keys to persist: `FileVault` is AES-256-GCM with a separate 0600 key file (the HUMAN-TODO fallback; an OS keychain can replace it). The token endpoint checks the DPoP proof **before** client authentication, so a nonce retry doesn't burn the agent's assertion `jti`s. Shared in-process wiring lives in `test-support/testbed.ts`. |

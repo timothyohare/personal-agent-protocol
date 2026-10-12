@@ -14,5 +14,8 @@
     "hono": "4.13.9",
     "jose": "6.2.12",
     "poppy-core": "0.1.0"
+  },
+  "devDependencies": {
+    "agent": "0.1.0"
   }
 }

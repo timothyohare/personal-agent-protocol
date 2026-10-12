@@ -1,15 +1,34 @@
 import { Hono } from "hono";
 import { resolveConfig, type CompanyConfig, type ResolvedConfig } from "./config.ts";
+import { NonceManager, RateLimiter } from "./limits.ts";
+import { memoryStores, type Stores } from "./stores.ts";
+import { tokenRoutes } from "./token.ts";
+import { createAgentVerifier } from "./verifyAgent.ts";
 import { wellKnownRoutes } from "./wellknown.ts";
 
 export interface Company {
   app: Hono;
   config: ResolvedConfig;
+  stores: Stores;
 }
 
-export function createCompany(config: CompanyConfig): Company {
+export interface CompanyOptions {
+  stores?: Stores;
+  /** Token-endpoint requests per minute per client IP. */
+  tokenRateLimit?: number;
+}
+
+export function createCompany(config: CompanyConfig, opts: CompanyOptions = {}): Company {
   const c = resolveConfig(config);
+  const stores = opts.stores ?? memoryStores();
+  const deps = {
+    c, stores,
+    verifyAgent: createAgentVerifier(c),
+    nonces: new NonceManager(c.requireDpopNonce),
+    limiter: new RateLimiter(opts.tokenRateLimit ?? 120),
+  };
   const app = new Hono();
   app.route("/", wellKnownRoutes(c));
-  return { app, config: c };
+  app.route("/", tokenRoutes(deps));
+  return { app, config: c, stores };
 }
