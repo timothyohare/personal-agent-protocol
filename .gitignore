@@ -19,7 +19,7 @@ keys/
 vault*.json
 
 # Throwaway spike code (notes live in docs/spikes/)
-spikes/
+/spikes/
 
 # Editor / OS
 .DS_Store
