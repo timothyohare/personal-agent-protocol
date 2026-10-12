@@ -24,9 +24,11 @@ The callback page only forwards to `127.0.0.1` on a port taken from `state` (`<n
 
 ## Local check (done)
 
-Served from `localhost` and checked with headless Google Chrome 126.0.6478.182  (`--headless=new`). All three automatic variants reached the listener (GET, GET, POST), and a tampered `state` (`evil.example.com`) was refused with "Bad or missing state. Not forwarding." This proves the kit works. It does **not** answer the question, because `localhost` to `127.0.0.1` is never restricted.
+Served from `localhost` and checked with headless Google Chrome 126.0.6478.182 (`--headless=new`). All three automatic variants reached the listener (GET, GET, POST), and a tampered `state` (`evil.example.com`) was refused with "Bad or missing state. Not forwarding." This proves the kit works. It does **not** answer the question, because `localhost` to `127.0.0.1` is never restricted.
 
 ## How to run (Tim)
+
+**First, update Chrome.** This machine has Chrome **126** (mid-2024). The local-network restrictions this spike is testing arrived in much later versions, and current stable is around 149. A run on 126 would give a false pass. Check the version at `chrome://version`, and record the exact versions of all three browsers in the results table.
 
 ```bash
 node spikes/S3-callback/listener.mjs https://timothyohare.github.io/personal-agent-protocol/s3/
