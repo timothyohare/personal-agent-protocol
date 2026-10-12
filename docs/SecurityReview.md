@@ -145,12 +145,41 @@ Each attack is an automated test with an exact expected result. Briefing milesto
 
 ## 7. Sign-off checklist (Checkpoint D)
 
-- [ ] Every v1 attack (A-01 to A-24 and A-42 to A-46) is automated and passing. For v1.1, A-25 to A-41 are also passing, against both local and cloud.
-- [ ] `gate-mutation` is at least 80% on `poppy-core` and on the company's `middleware`, `token` and `authorize` modules, with no surviving mutants in a check listed in section 4.
-- [ ] `algorithms` is pinned to ES256 at every `jwtVerify` call site (grep).
-- [ ] The dev localhost flag is refused when `NODE_ENV=production` (test).
-- [ ] The log redaction test (A-22) passes against the acceptance run.
-- [ ] `npm audit --omit=dev` shows no high or critical issues.
-- [ ] Secrets: the agent private key and vault file are git-ignored and absent from history (`git log -p -- . ':!docs' | grep -c '"d":'` returns 0; `docs/` is excluded because this checklist quotes the pattern).
-- [ ] Consent page headers verified (T-10), and the host is shown (T-11).
-- [ ] The re-review against the code is recorded here, with its date.
+- [x] Every v1 attack (A-01 to A-20, A-23, A-24, A-40 and A-42 to A-46) is automated and passing, both in-process (`packages/company/test/attacks.test.ts`) and against the booted services (`npm run attacks`, run by `gate-verify`): **28/28 fail closed**. A-21 is covered by the chat-agent test (Task 12) and A-22 by `scripts/check-logs.ts` (the `gate-verify` observability step). For v1.1, A-25 to A-41 are still to do.
+- [ ] `gate-mutation` is at least 80% on `poppy-core` and on the company's `middleware`, `token` and `authorize` modules, with no surviving mutants in a check listed in section 4. *(Result pending; see the re-review below.)*
+- [x] `algorithms` is pinned to ES256 at every `jwtVerify` call site (grep): there are two, `poppy-core/src/dpop.ts` and `poppy-core/src/assertions.ts`, and both pin it.
+- [x] The dev localhost flag is refused when `NODE_ENV=production` (test in `poppy-core/test/dev-log.test.ts`).
+- [x] The log redaction test (A-22) passes against the acceptance run (`check-logs: ✓ 266 lines, no secrets`).
+- [x] `npm audit --omit=dev` shows no high or critical issues (0 vulnerabilities, 12 Oct 2026).
+- [x] Secrets: the agent private key and vault file are git-ignored (`keys/`, `.vault/`) and absent from history. `git log -p -- . ':!docs' | grep -cE '"d" *: *"[A-Za-z0-9_-]{40,}'` returns 0. (The older `grep -c '"d":'` also matches the leak checker's own regex in `test-support/leaks.ts`, so the command now looks for an actual key value.)
+- [x] Consent page headers verified (T-10), and the host is shown (T-11): `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `no-store`, `no-referrer`, `nosniff` and `Permissions-Policy: tools=()` are all tested, and the consent page shows the `client_id` host beside the agent's self-chosen name.
+- [ ] The re-review against the code is recorded here, with its date. *(Draft below; it needs Tim's sign-off.)*
+
+### Re-review against the code (draft, 12–13 October 2026, overnight run)
+
+| Threat | Where it's handled | Evidence |
+|---|---|---|
+| T-01, T-02 | `poppy-core/src/dpop.ts` `verifyDpop`, called by `company/src/middleware.ts` with `ath`, the bound thumbprint and `htu` built from `PUBLIC_BASE_URL` | A-01 to A-03, A-06, A-07, A-24, A-40 |
+| T-03, T-12 | `company/src/verifyAgent.ts`: HTTPS only, addresses resolved and blocked ranges refused (IPv4 and IPv6, including mapped), no redirects, 3 s, 64 KB, JSON only, same-host `jwks_uri` and `redirect_uris`, no private or symmetric keys in the JWKS. The dev exception covers `http://localhost` only. | A-09, A-18, A-19, `verifyAgent.test.ts` |
+| T-04 | `poppy-core/src/assertions.ts`: single-string `aud`, `jti` ≥ 16 characters recorded last, `iat` age ≤ 300 s | A-10, A-11 |
+| T-05 | `company/src/token.ts` `ownedSession` (same `client_id` and User ID) and `grants.ts` | A-04, A-43 |
+| T-06, T-08 | `company/src/authorize.ts`: exact `redirect_uri` match and PKCE S256 checked **before** any redirect. Codes are single-use (deleted on first presentation) and last 60 s. | A-12 to A-14, A-16, A-40 |
+| T-07 | `agent/src/company.ts` `completeSignIn` checks `state` and `iss` before any token request | A-05, A-15 |
+| T-09 | Per-request CSRF token bound to an HttpOnly, SameSite=Lax cookie, on both login and consent | A-17, `hardening.test.ts` |
+| T-13 | `agent/src/vault.ts` `FileVault`: AES-256-GCM, separate 0600 key file. Refresh needs the client assertion. | A-20, vault tests |
+| T-14 | Each Session Token records its Account Token, and the middleware requires the Session to still be signed in with that same Account Token, on every request | A-08, "F11" test in `hardening.test.ts` |
+| T-15 | `agent/src/chat.ts`: a `confirm` node interrupts before every write. Tokens live inside the tool. | `chat.test.ts` (A-21, F12) |
+| T-16 | `poppy-core/src/log.ts` redaction, plus `check-logs.ts` over every service's log | A-22 |
+| T-17 | Granted scope = requested ∩ ticked. Refresh can only narrow. | A-23, A-44, refresh tests |
+| T-19 | Bounded replay store, fixed-window limits on the token, revoke and login endpoints | `hardening.test.ts` rate-limit tests |
+| T-20 | ES256 pinned at both `jwtVerify` sites | grep above, A-24 |
+
+**Changes made during the build that a reviewer should know about:**
+- The token endpoint verifies the DPoP proof *before* client authentication, so a nonce retry doesn't burn the agent's assertion `jti`s.
+- A-46 returns **400 `invalid_request`** ("token was issued to another client"), and the token stays valid.
+- Revocation's client assertion uses the **token endpoint** as `aud`, like every other client assertion at the company.
+- The login rate limit is per sign-in request (10 a minute), not per IP.
+
+**Known gaps (accepted for the demo, or for Tim to decide):**
+- DNS rebinding: `verifyAgent` resolves the host, then `fetch` resolves it again. A production version would pin the checked address for the connection.
+- The fixed-window rate limiter treats every in-process request as one client (`local`).
