@@ -90,6 +90,27 @@ const stages: Record<string, () => Promise<void>> = {
     const narrowed = await signIn(await newClient(), ["poppy:read", "poppy:write"], ["poppy:write"]);
     check(narrowed.scope.join(" ") === "poppy:read", "unticked poppy:write is not granted");
   },
+
+  /** Milestone 3: GET 403 → sign in → POST a tip → GET shows it. Plus insufficient_scope. */
+  async tips() {
+    const c = await newClient();
+    const denied = await c.call("GET", "/api/me/tips");
+    check(denied.status === 403 && denied.error === "sign_in_required", "signed out: GET /api/me/tips is 403 sign_in_required");
+    await signIn(c, ["poppy:read", "poppy:write", "standings"]);
+    const post = await c.call("POST", "/api/me/tips", { fixture_id: "r27-1", team: "Storm" });
+    check(post.status === 201, "POST /api/me/tips (Storm, round 27) returns 201");
+    const get = await c.call("GET", "/api/me/tips");
+    const tips = (get.body as { tips: { fixture_id: string; team: string }[] }).tips;
+    check(tips.some((t) => t.fixture_id === "r27-1" && t.team === "Storm"), "GET /api/me/tips shows the tip");
+    const score = await c.call("GET", "/api/me/score");
+    check(score.status === 200, "GET /api/me/score works with the custom standings scope");
+
+    const narrow = await newClient();
+    await signIn(narrow, ["poppy:read", "poppy:write"], ["poppy:write"]);
+    const r = await narrow.call("POST", "/api/me/tips", { fixture_id: "r27-1", team: "Storm" });
+    check(r.status === 403 && r.error === "insufficient_scope" && r.requiredScope === "poppy:write",
+      "without poppy:write: POST is 403 insufficient_scope, scope=poppy:write");
+  },
 };
 
 const only = process.argv.slice(2);

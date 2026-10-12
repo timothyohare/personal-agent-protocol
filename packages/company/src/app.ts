@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { meApi } from "./api/me.ts";
 import { publicApi } from "./api/public.ts";
 import { authorizeRoutes } from "./authorize.ts";
 import { requireSessionToken, type AuthEnv } from "./middleware.ts";
@@ -43,6 +44,7 @@ export function createCompany(config: CompanyConfig, opts: CompanyOptions = {}):
   const api = new Hono<AuthEnv>();
   api.use("/api/*", requireSessionToken(c, stores, deps.nonces));
   api.route("/", publicApi());
+  api.route("/", meApi(stores));
   app.route("/", api);
   return { app, config: c, stores };
 }

@@ -257,12 +257,12 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Description:** Add `GET /api/me/tips` (`poppy:read`), `POST /api/me/tips` (`poppy:write`) and `GET /api/me/score` (custom `standings` scope). The agent reacts to 403 `sign_in_required` by starting sign-in, and to `insufficient_scope` by reporting the missing scope.
 
 **Acceptance criteria:**
-- [ ] A signed-out request gets 403 `sign_in_required`. A signed-in request without the scope gets 403 `insufficient_scope` with `scope=` in `WWW-Authenticate`.
-- [ ] A tip is validated (a known round and fixture, a team in that fixture) and persisted per account.
+- [x] A signed-out request gets 403 `sign_in_required`. A signed-in request without the scope gets 403 `insufficient_scope` with `scope=` in `WWW-Authenticate`.
+- [x] A tip is validated (a known round and fixture, a team in that fixture) and persisted per account.
 
 **Verification:**
-- [ ] The acceptance script extends to: GET 403 → sign-in → POST tip → GET shows it.
-- [ ] `gate-verify` is green.
+- [x] The acceptance script extends to: GET 403 → sign-in → POST tip → GET shows it.
+- [x] `gate-verify` is green.
 
 **Dependencies:** 8
 **Files:** `packages/company/src/api/me.ts`, `packages/agent/src/cli.ts`, tests

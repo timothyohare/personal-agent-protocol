@@ -48,6 +48,13 @@ export interface AccountToken {
   revoked: boolean;
 }
 
+export interface Tip {
+  fixture_id: string;
+  round: number;
+  team: string;
+  submitted_at: string;
+}
+
 export interface Stores {
   replay: ReplayStore;
   sessions: Map<string, Session>;
@@ -59,6 +66,8 @@ export interface Stores {
   pending: Map<string, PendingAuthz>;
   /** Keyed by username. */
   users: Map<string, User>;
+  /** Tips by account, then by fixture. */
+  tips: Map<string, Map<string, Tip>>;
 }
 
 export function memoryStores(): Stores {
@@ -70,6 +79,7 @@ export function memoryStores(): Stores {
     accountTokens: new Map(),
     pending: new Map(),
     users: new Map([[DEFAULT_TEST_USER.username, makeUser(DEFAULT_TEST_USER.username, DEFAULT_TEST_USER.password)]]),
+    tips: new Map(),
   };
 }
 

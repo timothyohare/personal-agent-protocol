@@ -1,7 +1,7 @@
 // The personal agent CLI. Narrated protocol events go to stderr; results go to stdout.
 import { createInterface } from "node:readline";
 import { PoppyError } from "poppy-core";
-import type { CompanyClient } from "./company.ts";
+import type { CallResult, CompanyClient } from "./company.ts";
 import { agentConfigFromEnv, clientFromConfig } from "./config.ts";
 import { startLoopback } from "./loopback.ts";
 
@@ -38,9 +38,26 @@ export const USAGE = `usage: agent <command>
   session                  start a signed-out Session
   fixtures [round]         GET /api/fixtures
   ladder                   GET /api/ladder
+  tips                     your tips (signs in if needed)
+  tip TEAM [ROUND]         tip TEAM to win its match this round (or ROUND)
+  score                    your score (custom scope: standings)
   signin [scope ...]       Direct Sign-In in your browser (default: all scopes)
   status                   show the Session and whether an Account Token is stored
   call METHOD PATH [JSON]  call any API path`;
+
+type Call = () => Promise<CallResult>;
+
+/**
+ * Runs an API call. On 403 sign_in_required it asks the user to sign in, then retries once.
+ * On insufficient_scope it reports the missing scope instead (the user unticked it).
+ */
+async function withSignIn(client: CompanyClient, io: CliIo, call: Call): Promise<CallResult> {
+  const r = await call();
+  if (r.error !== "sign_in_required") return r;
+  io.out("This needs you to sign in to the company.");
+  await signIn(client, DEFAULT_SCOPES, io);
+  return call();
+}
 
 export async function runCli(argv: string[], client: CompanyClient, ioOrOut: CliIo | ((s: string) => void)): Promise<number> {
   const io: CliIo = typeof ioOrOut === "function"
@@ -48,7 +65,11 @@ export async function runCli(argv: string[], client: CompanyClient, ioOrOut: Cli
   const out = io.out;
   const [cmd, ...args] = argv;
   const print = (v: unknown) => out(JSON.stringify(v, null, 2));
-  const show = (r: { status: number; body: unknown; error?: string }) => {
+  const show = (r: CallResult) => {
+    if (r.error === "insufficient_scope") {
+      out(`You haven't allowed the "${r.requiredScope}" scope. Run: signin ${r.requiredScope}`);
+      return 1;
+    }
     print(r.error ? { status: r.status, error: r.error } : r.body);
     return r.status < 400 ? 0 : 1;
   };
@@ -68,6 +89,27 @@ export async function runCli(argv: string[], client: CompanyClient, ioOrOut: Cli
       return show(await client.call("GET", args[0] ? `/api/fixtures?round=${encodeURIComponent(args[0])}` : "/api/fixtures"));
     case "ladder":
       return show(await client.call("GET", "/api/ladder"));
+    case "tips":
+      return show(await withSignIn(client, io, () => client.call("GET", "/api/me/tips")));
+    case "score":
+      return show(await withSignIn(client, io, () => client.call("GET", "/api/me/score")));
+    case "tip": {
+      const [team, round] = args;
+      if (!team) break;
+      const f = await client.call("GET", round ? `/api/fixtures?round=${encodeURIComponent(round)}` : "/api/fixtures");
+      if (f.status !== 200) return show(f);
+      const fixtures = (f.body as { fixtures: { id: string; home: string; away: string }[] }).fixtures;
+      const want = team.toLowerCase();
+      const match = fixtures.find((x) => [x.home, x.away].some((t) => t.toLowerCase() === want))
+        ?? fixtures.find((x) => [x.home, x.away].some((t) => t.toLowerCase().includes(want)));
+      if (!match) {
+        out(`${team} isn't playing in that round.`);
+        return 1;
+      }
+      const name = [match.home, match.away].find((t) => t.toLowerCase().includes(want))!;
+      return show(await withSignIn(client, io,
+        () => client.call("POST", "/api/me/tips", { fixture_id: match.id, team: name })));
+    }
     case "signin": {
       const s = await signIn(client, args.length ? args : DEFAULT_SCOPES, io);
       print({ signed_in: s.signedIn, session_id: s.sessionId, scope: s.scope });
