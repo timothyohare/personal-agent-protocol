@@ -17,6 +17,7 @@ test("poppy.json matches briefing 9.3", async () => {
     },
     apis: [{ type: "openapi", url: "https://tipping.ohare.id.au/openapi.json",
       description: "Fixtures, ladder, your tips and score" }],
+    agent: { protocols: [{ type: "poppy", endpoint: "https://tipping.ohare.id.au/conversations" }] },
   });
 });
 

@@ -57,7 +57,7 @@ export function createCompany(config: CompanyConfig, opts: CompanyOptions = {}):
 
   const api = new Hono<AuthEnv>();
   api.use("/api/*", requireSessionToken(c, stores, deps.nonces));
-  api.use("/conversations", requireSessionToken(c, stores, deps.nonces));
+  // In Hono, "/conversations/*" also matches "/conversations" itself (registering both ran the check twice).
   api.use("/conversations/*", requireSessionToken(c, stores, deps.nonces));
   api.route("/", publicApi());
   api.route("/", meApi(stores));

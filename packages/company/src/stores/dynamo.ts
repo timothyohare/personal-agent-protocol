@@ -7,7 +7,8 @@
 // the Sessions to sign out when an Account Token is revoked.
 import { ConditionalCheckFailedException, CreateTableCommand, DynamoDBClient, ResourceInUseException } from "@aws-sdk/client-dynamodb";
 import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import type { ReplayStore } from "poppy-core";
+import type { ConversationEvent, ReplayStore } from "poppy-core";
+import { newEventId, type Conversation, type ConversationStores, type EventLog, type MessageRecord } from "../conversations/store.ts";
 import type { PendingAuthz } from "../authorize.ts";
 import type {
   AccountToken, AuthCode, Session, SessionTable, SessionToken, Stores, Table, Tip, TipTable,
@@ -117,10 +118,20 @@ export class DynamoTable<T> extends Base implements Table<T> {
     }
   }
 
-  /** DeleteItem returning the old item: only one concurrent caller can get it back. */
+  /**
+   * A conditional DeleteItem returning the old item. The condition matters: without it, concurrent
+   * deletes can each get the old item back (seen with DynamoDB Local: 5 of 20 parallel code
+   * exchanges succeeded). With it, every caller after the first fails the condition.
+   */
   async take(id: string): Promise<T | undefined> {
-    const r = await this.db.send(new DeleteCommand({ TableName: this.table, Key: this.key(id), ReturnValues: "ALL_OLD" }));
-    return this.live(r.Attributes);
+    try {
+      const r = await this.db.send(new DeleteCommand({ TableName: this.table, Key: this.key(id), ReturnValues: "ALL_OLD",
+        ConditionExpression: "attribute_exists(pk)" }));
+      return this.live(r.Attributes);
+    } catch (e) {
+      if (e instanceof ConditionalCheckFailedException) return undefined;
+      throw e;
+    }
   }
 }
 
@@ -203,5 +214,44 @@ export async function dynamoStores(o: DynamoOptions): Promise<Stores> {
     pending: t<PendingAuthz>("pending"),
     users,
     tips: new DynamoTipTable(db, o.table, `${ns}tips`),
+  };
+}
+
+/**
+ * The conversation event log: a per-conversation counter (an atomic ADD) gives each event its
+ * position, so events keep their order across Lambda instances.
+ */
+export class DynamoEventLog extends Base implements EventLog {
+  async append(conversationId: string, e: Parameters<EventLog["append"]>[1]): Promise<ConversationEvent> {
+    const r = await this.db.send(new UpdateCommand({ TableName: this.table,
+      Key: { pk: `${this.prefix}seq#${conversationId}`, sk: NO_SORT },
+      UpdateExpression: "ADD n :one", ExpressionAttributeValues: { ":one": 1 }, ReturnValues: "UPDATED_NEW" }));
+    const seq = Number(r.Attributes!.n);
+    const event = { ...e, id: newEventId(), created_at: new Date().toISOString() } as ConversationEvent;
+    await this.db.send(new PutCommand({ TableName: this.table,
+      Item: { pk: `${this.prefix}evt#${conversationId}`, sk: String(seq).padStart(10, "0"), v: event } }));
+    return event;
+  }
+
+  async list(conversationId: string): Promise<ConversationEvent[]> {
+    const out: ConversationEvent[] = [];
+    let start: Record<string, unknown> | undefined;
+    do {
+      const r = await this.db.send(new QueryCommand({ TableName: this.table, KeyConditionExpression: "pk = :p",
+        ExpressionAttributeValues: { ":p": `${this.prefix}evt#${conversationId}` }, ConsistentRead: true, ExclusiveStartKey: start }));
+      for (const item of r.Items ?? []) out.push(item.v as ConversationEvent);
+      start = r.LastEvaluatedKey;
+    } while (start);
+    return out;
+  }
+}
+
+export function dynamoConversationStores(o: DynamoOptions): ConversationStores {
+  const db = dynamoClient(o);
+  const ns = o.namespace ? `${o.namespace}#` : "";
+  return {
+    conversations: new DynamoTable<Conversation>(db, o.table, `${ns}cnv`),
+    messages: new DynamoTable<MessageRecord>(db, o.table, `${ns}msg`),
+    events: new DynamoEventLog(db, o.table, ns),
   };
 }

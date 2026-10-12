@@ -5,10 +5,13 @@
   "build": "npm run build",
   "boot": "npm run dev:local",
   "ready": "http://localhost:8788/agent.json",
-  "acceptance": "npm run acceptance && npm run attacks",
+  "acceptance": "npm run acceptance && npm run attacks && npm run test:dynamo",
   "mutation": "npm run mutation",
   "observability": "node scripts/check-logs.ts",
   "env": {
-    "POPPY_LOG_FILE": ".logs/verify.log"
-  }
+    "POPPY_LOG_FILE": ".logs/verify.log",
+    "DYNAMODB_ENDPOINT": "http://localhost:8000",
+    "DYNAMODB_TABLE": "poppy-verify"
+  },
+  "mockAws": "dynamodb-local"
 }

@@ -365,11 +365,13 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Description:** Implement every v1 store interface on DynamoDB with TTLs and conditional writes. Keep the in-memory stores for unit tests.
 
 **Acceptance criteria:**
-- [ ] The full v1 test suite passes against both the in-memory stores and DynamoDB Local.
-- [ ] Two concurrent requests with the same `jti` (or the same code) produce exactly one success (A-40).
+- [x] The full v1 test suite passes against both the in-memory stores and DynamoDB Local.
+- [x] Two concurrent requests with the same `jti` (or the same code) produce exactly one success (A-40).
 
 **Verification:**
-- [ ] `harness.json` gains `"mockAws": "dynamodb-local"`, and `gate-verify` is green.
+- [x] `harness.json` gains `"mockAws": "dynamodb-local"`, and `gate-verify` is green.
+
+*Done 13 Oct on the `v1.1` branch.* `npm run test:dynamo` runs the whole suite against DynamoDB Local, and `gate-verify` runs it too. **A-40 caught a real bug:** an unconditional `DeleteItem … ALL_OLD` let 5 of 20 parallel code exchanges succeed. `take` now uses `ConditionExpression: attribute_exists(pk)`. The `dynamo.ts` mutation run is still to do.
 - [ ] `gate-mutation` on `company/src/stores/dynamo.ts` is at least 80%.
 
 **Dependencies:** Checkpoint E
@@ -411,9 +413,11 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 Add the `agent.protocols` entry in `poppy.json`. A worker Lambda replies with a scripted echo. The agent gets `npm run agent -- chat-company`.
 
 **Acceptance criteria:**
-- [ ] The message and event JSON matches briefing 9.8 field for field (a schema test built from the spec examples). Every response includes `status` and `responder`.
-- [ ] A retried first message returns the same conversation, and a reused ID with different content returns 409 `message_id_conflict`.
+- [x] The message and event JSON matches briefing 9.8 field for field (a schema test built from the spec examples). Every response includes `status` and `responder`.
+- [x] A retried first message returns the same conversation, and a reused ID with different content returns 409 `message_id_conflict`.
 - [ ] Ownership is enforced (`client_id` + user ID, or the account once linked). Another user's conversation returns 404 (A-25). All 7.13 error codes are covered.
+
+*In progress 13 Oct (`v1.1` branch), built locally ahead of Task 14:* `start`, `messages`, `events` (cursor, paging, long-poll capped at 25 s), `close`, retries and conflicts, ownership (404) and 7.11 `sign_in_required`, on memory and DynamoDB stores. There's also an agent-side `AgentConversation`, and the scripted echo agent runs in-process. Still to do: `cursor_expired`, the worker Lambda (Task 14) and `npm run agent -- chat-company`. A reference for the spec rules is in [spec-section7-notes.md](spec-section7-notes.md).
 
 **Verification:**
 - [ ] Acceptance stage "conversation" passes in `gate-verify`.

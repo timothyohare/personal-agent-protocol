@@ -30,7 +30,9 @@ describe("starting and messaging (7.3)", () => {
     const { post, msg } = await setup();
     const r = await post(P, msg("Hello"));
     expect(r.status).toBe(201);
-    expect(r.body).toEqual({ conversation_id: expect.stringMatching(/^cnv_[A-Za-z0-9_-]{16}$/), status: "idle", responder: "agent" });
+    // The company agent may already have picked the message up, so idle or working.
+    expect(r.body).toEqual({ conversation_id: expect.stringMatching(/^cnv_[A-Za-z0-9_-]{16}$/),
+      status: expect.stringMatching(/^(idle|working)$/), responder: "agent" });
   });
 
   test("events follow briefing 9.8: the user message, working, the reply, idle", async () => {

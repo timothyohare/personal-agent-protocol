@@ -96,7 +96,8 @@ export interface Stores {
 export class MemoryTable<T> implements Table<T> {
   protected items = new Map<string, { value: T; expiresAt: number | undefined }>();
 
-  async get(id: string): Promise<T | undefined> {
+  /** Synchronous, so take and create can't interleave with another caller. */
+  private live(id: string): T | undefined {
     const item = this.items.get(id);
     if (!item) return undefined;
     if (item.expiresAt !== undefined && item.expiresAt <= Date.now()) {
@@ -104,6 +105,10 @@ export class MemoryTable<T> implements Table<T> {
       return undefined;
     }
     return structuredClone(item.value);
+  }
+
+  async get(id: string): Promise<T | undefined> {
+    return this.live(id);
   }
 
   async put(id: string, value: T, expiresAt?: number): Promise<void> {
@@ -115,14 +120,14 @@ export class MemoryTable<T> implements Table<T> {
   }
 
   async take(id: string): Promise<T | undefined> {
-    const v = await this.get(id);
+    const v = this.live(id);
     this.items.delete(id);
     return v;
   }
 
   async create(id: string, value: T, expiresAt?: number): Promise<boolean> {
-    if (await this.get(id) !== undefined) return false;
-    await this.put(id, value, expiresAt);
+    if (this.live(id) !== undefined) return false;
+    this.items.set(id, { value: structuredClone(value), expiresAt });
     return true;
   }
 }

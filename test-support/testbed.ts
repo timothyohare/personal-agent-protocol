@@ -4,7 +4,7 @@ import { createAgentHost } from "agent-host";
 import { CompanyClient, MemoryVault, loadIdentity, type AgentDeps, type Vault } from "agent";
 import { createCompany, tippingCo, type CompanyConfig, type CompanyOptions, type Table } from "company";
 import { createLogger, fetchRouter, rid, type Handler } from "poppy-core";
-import { dynamoStores, ensureTable } from "company/dynamo";
+import { dynamoConversationStores, dynamoStores, ensureTable } from "company/dynamo";
 
 export const COMPANY_HOST = "tipping.example";
 export const COMPANY = `https://${COMPANY_HOST}`;
@@ -39,14 +39,17 @@ export async function testbed(opts: TestbedOptions = {}) {
   const log = createLogger("company", (l) => logs.push(l));
   // POPPY_STORES=dynamo runs every test against DynamoDB Local (npm run test:dynamo).
   let stores = opts.stores;
+  let conversationStores = opts.conversationStores;
   if (!stores && process.env.POPPY_STORES === "dynamo") {
     const o = { table: process.env.DYNAMODB_TABLE ?? "poppy-test", endpoint: process.env.DYNAMODB_ENDPOINT ?? "http://localhost:8000" };
     await ensureTable(o);
-    stores = await dynamoStores({ ...o, namespace: rid() });
+    const namespace = rid();
+    stores = await dynamoStores({ ...o, namespace });
+    conversationStores ??= dynamoConversationStores({ ...o, namespace });
   }
   const company = createCompany({
     ...tippingCo(COMPANY, false), fetch, log, resolveHost: async () => ["93.184.216.34"], ...opts.company,
-  }, { ...opts, ...(stores ? { stores } : {}) });
+  }, { ...opts, ...(stores ? { stores } : {}), ...(conversationStores ? { conversationStores } : {}) });
   hosts[COMPANY_HOST] = company.app;
 
   /** Adds an agent host at `host` and returns that agent's identity. */
