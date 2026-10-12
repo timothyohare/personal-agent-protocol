@@ -14,6 +14,8 @@ export interface CompanyConfig {
   /** Require a server-issued DPoP nonce (exercises the agent's retry, spec 4.3). */
   requireDpopNonce?: boolean;
   sessionTokenTtlS?: number;
+  /** Issue a new Account Token on every refresh (spec 4.8 allows it; the agent must then use the new one). */
+  rotateAccountTokens?: boolean;
   log?: Logger;
   /** Used to fetch agent metadata and JWKS. Injected in tests. */
   fetch?: typeof fetch;
@@ -35,6 +37,7 @@ export function resolveConfig(c: CompanyConfig): ResolvedConfig {
   return {
     requireDpopNonce: false,
     sessionTokenTtlS: 3600,
+    rotateAccountTokens: false,
     log: silentLogger,
     fetch: globalThis.fetch,
     ...c,

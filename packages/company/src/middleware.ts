@@ -33,8 +33,9 @@ export function authError(
  * Whether a token is signed in right now. Checked on every request (F11): revoking the
  * Account Token signs the Session out, and the old signed-in token stops working at once.
  */
-export function currentAuth(stores: Stores, token: SessionToken, session: Session): Omit<Auth, "session" | "token"> {
-  const signedIn = token.accountId !== null && session.accountId === token.accountId;
+export function currentAuth(token: SessionToken, session: Session): Omit<Auth, "session" | "token"> {
+  const signedIn = token.accountTokenId !== null && session.accountTokenId === token.accountTokenId
+    && session.accountId === token.accountId;
   return { signedIn, accountId: signedIn ? token.accountId : null, scope: signedIn ? token.scope : [] };
 }
 
@@ -62,7 +63,7 @@ export function requireSessionToken(c: ResolvedConfig, stores: Stores, nonces: N
       c.log.event("api.rejected", { error: err.code, path: ctx.req.path, detail: err.message });
       return authError(ctx, 401, err.code ?? "invalid_dpop_proof", err.message, {}, nonceHeader);
     }
-    ctx.set("auth", { session, token, ...currentAuth(stores, token, session) });
+    ctx.set("auth", { session, token, ...currentAuth(token, session) });
     await next();
     for (const [k, v] of Object.entries(nonceHeader)) ctx.header(k, v);
   };

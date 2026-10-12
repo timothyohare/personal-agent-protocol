@@ -22,6 +22,8 @@ export interface SessionToken {
   jkt: string;
   /** The account this token was issued for, or null for a signed-out token. */
   accountId: string | null;
+  /** The Account Token behind this signed-in token. Revoking it signs the token out (F11). */
+  accountTokenId: string | null;
   scope: string[];
   expiresAt: number;
   /** A Bearer MCP token's resource (Task 20). Undefined for DPoP tokens. */

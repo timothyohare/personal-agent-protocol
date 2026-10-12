@@ -66,9 +66,14 @@ describe("signed in", () => {
       .toMatchObject({ status: 403, error: "insufficient_scope", requiredScope: "poppy:write" });
   });
 
-  test("a signed-out token for a signed-in Session is still signed out (renewal by assertion)", async () => {
-    const { client } = await signedIn();
-    await client.startSession({ renew: true });
-    expect((await client.call("GET", "/api/me/tips")).error).toBe("sign_in_required");
+  test("a renewal by assertion gives a signed-out token; the agent then signs it in with its Account Token", async () => {
+    const { client, tb } = await signedIn();
+    const renewed = await client.startSession({ renew: true });
+    const { currentAuth } = await import("../src/index.ts");
+    const st = tb.company.stores.tokens.get(renewed.token)!;
+    expect(currentAuth(st, tb.company.stores.sessions.get(st.sessionId)!).signedIn).toBe(false);
+    expect((await client.call("GET", "/api/me/tips")).status).toBe(200);
+    expect(client.session!.signedIn).toBe(true);
+    expect(client.session!.sessionId).toBe(renewed.sessionId);
   });
 });

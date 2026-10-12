@@ -12,3 +12,4 @@ export * from "./authorize.ts";
 export * from "./users.ts";
 export * from "./views.ts";
 export * from "./grants.ts";
+export * from "./revoke.ts";

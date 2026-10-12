@@ -185,9 +185,16 @@ export class CompanyClient {
     return s;
   }
 
-  /** A usable Session Token: the current one, or a fresh session if none or nearly expired. */
+  /**
+   * A usable Session Token: the current one, or a new Session if there's none or it's nearly expired.
+   * With an Account Token in the vault, the new Session starts signed in (spec 4.8, "later runs").
+   */
   async ensureSession(): Promise<SessionState> {
     if (this.session && this.session.expiresAt - Date.now() > 30_000) return this.session;
+    if (await this.accountToken()) {
+      const resumed = await this.resume().catch(() => undefined);
+      if (resumed) return resumed;
+    }
     return this.startSession();
   }
 
@@ -199,7 +206,7 @@ export class CompanyClient {
     const url = new URL(path, await this.apiOrigin());
     if (url.origin !== await this.apiOrigin()) throw new PoppyError("invalid_request", 0, "path must be relative");
     const key = await this.dpopKey();
-    const retried = { nonce: false, rate: false, token: false };
+    const retried = { nonce: false, rate: false, token: false, signIn: false };
     for (;;) {
       const s = await this.ensureSession();
       const nonce = this.nonces.get(url.origin);
@@ -231,8 +238,12 @@ export class CompanyClient {
       if (res.status === 401 && error === "invalid_token" && !retried.token) {
         retried.token = true;
         this.session = undefined;
-        await this.onInvalidToken();
         continue;
+      }
+      // Signed out, but we hold an Account Token: sign this Session in with it and retry once.
+      if (res.status === 403 && error === "sign_in_required" && !retried.signIn && await this.accountToken()) {
+        retried.signIn = true;
+        if (await this.refreshIntoSession().then(() => true, () => false)) continue;
       }
       this.d.log.event("api.call", { method, path: url.pathname, status: res.status, error });
       const result: CallResult = { status: res.status, body: json };
@@ -241,9 +252,6 @@ export class CompanyClient {
       return result;
     }
   }
-
-  /** Hook for subclasses: get a new token after invalid_token (Task 10 uses the Account Token). */
-  protected async onInvalidToken(): Promise<void> {}
 
   private accountKey = async () => `account_token:${await this.issuer()}`;
 
@@ -258,6 +266,77 @@ export class CompanyClient {
 
   protected async forgetAccountToken(): Promise<void> {
     await this.d.vault.delete(await this.accountKey());
+  }
+
+  /**
+   * Uses the Account Token at the token endpoint (spec 4.8). With `sessionId` it signs that Session in;
+   * without, it starts a new signed-in Session. A rotated Account Token replaces the stored one (S4 G9).
+   * An invalid_grant means the token was revoked or expired, so it's dropped from the vault.
+   */
+  private async refresh(sessionId?: string, scope?: string[]): Promise<SessionState> {
+    const at = await this.accountToken();
+    if (!at) throw new PoppyError("no_account_token", 0, "not signed in: no Account Token stored");
+    let t: TokenResponse;
+    try {
+      t = await this.tokenRequest(async () => ({
+        grant_type: "refresh_token", refresh_token: at.token,
+        ...(sessionId ? { session_id: sessionId } : {}), ...(scope ? { scope: scope.join(" ") } : {}),
+      }));
+    } catch (e) {
+      if (e instanceof PoppyError && e.code === "invalid_grant") {
+        await this.forgetAccountToken();
+        this.d.log.event("account_token.dropped", { reason: e.detail });
+      }
+      throw e;
+    }
+    const s = this.adoptToken(t);
+    if (t.refresh_token && t.refresh_token !== at.token) {
+      await this.saveAccountToken({ token: t.refresh_token, scope: at.scope });
+      this.d.log.event("account_token.rotated", {});
+    }
+    return s;
+  }
+
+  /** Starts a new, already signed-in Session from the stored Account Token (milestone 4 "resume"). */
+  async resume(scope?: string[]): Promise<SessionState> {
+    const s = await this.refresh(undefined, scope);
+    this.d.log.event("session.resumed", { company: await this.issuer(), session_id: s.sessionId, scope: s.scope.join(" ") });
+    return s;
+  }
+
+  /** Signs the current Session in with the stored Account Token. */
+  async refreshIntoSession(): Promise<SessionState> {
+    const current = this.session ?? await this.startSession();
+    const s = await this.refresh(current.sessionId);
+    this.d.log.event("session.signed_in", { company: await this.issuer(), session_id: s.sessionId });
+    return s;
+  }
+
+  /** Signs out (spec 4.9): revokes the Account Token with the client assertion, then forgets it. */
+  async signOut(): Promise<boolean> {
+    const at = await this.accountToken();
+    if (!at) return false;
+    const { metadata } = await this.discovered();
+    const endpoint = metadata.revocation_endpoint;
+    if (!endpoint) throw new PoppyError("no_revocation_endpoint", 0, "the company has no revocation_endpoint");
+    const res = await this.d.fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        token: at.token, token_type_hint: "refresh_token", client_assertion_type: CLIENT_ASSERTION_TYPE,
+        // aud is the token endpoint, as for every other client assertion at this company.
+        client_assertion: await clientAssertion(this.d.identity.clientId, metadata.token_endpoint,
+          this.d.identity.signingKey),
+      }),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({})) as Record<string, string>;
+      throw new PoppyError(json.error ?? `http_${res.status}`, res.status, json.error_description);
+    }
+    await this.forgetAccountToken();
+    if (this.session) this.session = { ...this.session, signedIn: false, scope: [] };
+    this.d.log.event("signed_out", { company: metadata.issuer });
+    return true;
   }
 
   /**

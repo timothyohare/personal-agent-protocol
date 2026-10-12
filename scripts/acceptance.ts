@@ -30,8 +30,7 @@ function check(cond: unknown, msg: string): asserts cond {
   step(`✓ ${msg}`);
 }
 
-async function newClient(): Promise<CompanyClient> {
-  const dir = mkdtempSync(join(tmpdir(), "poppy-acceptance-"));
+async function newClient(dir = mkdtempSync(join(tmpdir(), "poppy-acceptance-"))): Promise<CompanyClient> {
   const privateJwk = JSON.parse(readFileSync(join(keysDir(), "agent-signing.private.json"), "utf8")) as JWK;
   const identity = await loadIdentity(`${AGENT}/agent.json`, privateJwk);
   return new CompanyClient(COMPANY, {
@@ -110,6 +109,31 @@ const stages: Record<string, () => Promise<void>> = {
     const r = await narrow.call("POST", "/api/me/tips", { fixture_id: "r27-1", team: "Storm" });
     check(r.status === 403 && r.error === "insufficient_scope" && r.requiredScope === "poppy:write",
       "without poppy:write: POST is 403 insufficient_scope, scope=poppy:write");
+  },
+
+  /** Milestone 4: kill the agent, resume signed in from the Account Token, sign out, then 403. */
+  async "resume-signout"() {
+    const dir = mkdtempSync(join(tmpdir(), "poppy-acceptance-"));
+    const first = await newClient(dir);
+    await signIn(first, ["poppy:read", "poppy:write"]);
+    await first.call("POST", "/api/me/tips", { fixture_id: "r27-3", team: "Roosters" });
+    step("agent process killed; a new one starts with the same vault");
+    const second = await newClient(dir);
+    const tips = await second.call("GET", "/api/me/tips");
+    check(tips.status === 200 && second.session?.signedIn === true,
+      "the new process is signed in from the Account Token, without the user");
+    secrets.add(second.session!.token);
+    const at = (await second.accountToken())!.token;
+    check(await second.signOut(), "signed out: Account Token revoked");
+    const after = await second.call("GET", "/api/me/tips");
+    check(after.status === 403 && after.error === "sign_in_required", "after sign-out: GET /api/me/tips is 403 sign_in_required");
+    // The stale Account Token no longer works at the token endpoint.
+    const third = await newClient(dir);
+    await third.discovered();
+    const refused = await third.tokenRequest(async () => ({ grant_type: "refresh_token", refresh_token: at }))
+      .then(() => "accepted", (e: { code?: string }) => e.code);
+    check(refused === "invalid_grant", "refresh with the revoked Account Token is invalid_grant");
+    check((await third.call("GET", "/api/fixtures")).status === 200, "public APIs still work signed out");
   },
 };
 

@@ -278,14 +278,16 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Description:** The `refresh_token` grant works with and without `session_id` (F10). `POST /oauth/revoke` revokes the Account Token and signs out its sessions. The middleware re-checks the signed-in state on every request (F11). The agent gets `resume` and `signout` commands.
 
 **Acceptance criteria:**
-- [ ] Refresh from a different `client_id` fails with `invalid_grant`. Refresh with a **new DPoP key** succeeds, and the new token is bound to that key (spec 4.3, 4.8; S4 E1).
-- [ ] A Session signed in to another account gives `account_mismatch` (A-43). `scope` can narrow but not widen. If the Company rotates the `refresh_token`, the agent's vault replaces it (S4 G2, G8, G9).
-- [ ] Revocation needs the client assertion. Revoking from another `client_id` fails and leaves the token valid (A-46, S4 G12).
-- [ ] After revocation, the next `/api/me/tips` call returns 403, and refresh fails.
+- [x] Refresh from a different `client_id` fails with `invalid_grant`. Refresh with a **new DPoP key** succeeds, and the new token is bound to that key (spec 4.3, 4.8; S4 E1).
+- [x] A Session signed in to another account gives `account_mismatch` (A-43). `scope` can narrow but not widen. If the Company rotates the `refresh_token`, the agent's vault replaces it (S4 G2, G8, G9).
+- [x] Revocation needs the client assertion. Revoking from another `client_id` fails and leaves the token valid (A-46, S4 G12).
+- [x] After revocation, the next `/api/me/tips` call returns 403, and refresh fails.
 
 **Verification:**
-- [ ] The acceptance script extends to milestone 4 (kill → resume → signout → 403).
-- [ ] `gate-verify` is green.
+- [x] The acceptance script extends to milestone 4 (kill → resume → signout → 403).
+- [x] `gate-verify` is green.
+
+*Done 12 Oct.* Each Session Token records the Account Token behind it, and the middleware requires the Session to still be signed in with **that** Account Token. So a token issued before a revocation stays signed out even if the user signs in again later. The agent uses a stored Account Token automatically: a new process resumes signed in, and a `sign_in_required` triggers one refresh into the current Session before giving up. Revocation's client assertion uses the token endpoint as `aud`, like every other assertion at the company.
 
 **Dependencies:** 9
 **Files:** `packages/company/src/{token,revoke,middleware}.ts`, `packages/agent/src/{resume,signout}.ts`

@@ -7,7 +7,8 @@ import { openApi } from "./openapi.ts";
 import { resolveConfig, type CompanyConfig, type ResolvedConfig } from "./config.ts";
 import { NonceManager, RateLimiter } from "./limits.ts";
 import { memoryStores, type Stores } from "./stores.ts";
-import { authorizationCodeGrant } from "./grants.ts";
+import { authorizationCodeGrant, refreshTokenGrant } from "./grants.ts";
+import { revokeRoutes } from "./revoke.ts";
 import { tokenRoutes } from "./token.ts";
 import { createAgentVerifier } from "./verifyAgent.ts";
 import { wellKnownRoutes } from "./wellknown.ts";
@@ -38,7 +39,11 @@ export function createCompany(config: CompanyConfig, opts: CompanyOptions = {}):
   const app = new Hono();
   app.route("/", wellKnownRoutes(c));
   app.route("/", authorizeRoutes({ ...deps, loginLimiter: new RateLimiter(opts.loginRateLimit ?? 10) }));
-  app.route("/", tokenRoutes(deps, { authorization_code: authorizationCodeGrant(deps) }));
+  app.route("/", tokenRoutes(deps, {
+    authorization_code: authorizationCodeGrant(deps),
+    refresh_token: refreshTokenGrant(deps),
+  }));
+  app.route("/", revokeRoutes(deps));
   app.get("/openapi.json", (ctx) => ctx.json(openApi(c)));
 
   const api = new Hono<AuthEnv>();

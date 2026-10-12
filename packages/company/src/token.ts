@@ -83,7 +83,8 @@ export function issueSessionToken(
   const token = newOpaqueToken();
   const signedIn = session.accountId !== null;
   d.stores.tokens.set(token, {
-    token, sessionId: session.id, jkt, accountId: session.accountId, scope: signedIn ? scope : [],
+    token, sessionId: session.id, jkt, accountId: session.accountId, accountTokenId: session.accountTokenId,
+    scope: signedIn ? scope : [],
     expiresAt: Date.now() + d.c.sessionTokenTtlS * 1000,
   });
   return {
@@ -119,7 +120,7 @@ function jwtBearerGrant(d: TokenDeps): GrantHandler {
       const s = ownedSession(d.stores, form.session_id, clientId, sub);
       d.c.log.event("session.renewed", { session_id: s.id, client_id: clientId });
       // A renewal through the assertion carries no account access (the Account Token does that).
-      return issueSessionToken(d, { ...s, accountId: null }, jkt, []);
+      return issueSessionToken(d, { ...s, accountId: null, accountTokenId: null }, jkt, []);
     }
     const session: Session = {
       id: newSessionId(), clientId, userId: sub, accountId: null, accountTokenId: null, ended: false,

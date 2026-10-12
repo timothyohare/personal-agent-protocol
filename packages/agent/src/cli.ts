@@ -43,6 +43,8 @@ export const USAGE = `usage: agent <command>
   score                    your score (custom scope: standings)
   signin [scope ...]       Direct Sign-In in your browser (default: all scopes)
   status                   show the Session and whether an Account Token is stored
+  resume                   start a signed-in Session from the stored Account Token
+  signout                  revoke the Account Token (signs every Session out)
   call METHOD PATH [JSON]  call any API path`;
 
 type Call = () => Promise<CallResult>;
@@ -113,6 +115,15 @@ export async function runCli(argv: string[], client: CompanyClient, ioOrOut: Cli
     case "signin": {
       const s = await signIn(client, args.length ? args : DEFAULT_SCOPES, io);
       print({ signed_in: s.signedIn, session_id: s.sessionId, scope: s.scope });
+      return 0;
+    }
+    case "resume": {
+      const s = await client.resume();
+      print({ session_id: s.sessionId, signed_in: s.signedIn, scope: s.scope });
+      return 0;
+    }
+    case "signout": {
+      print({ signed_out: await client.signOut() });
       return 0;
     }
     case "status": {
