@@ -28,7 +28,7 @@ export function authorizationCodeGrant(d: TokenDeps): GrantHandler {
     const session = ownedSession(d.stores, form.session_id, clientId);
 
     const at: AccountToken = { id: `at_${rid()}`, token: rid(32), clientId, userId: session.userId,
-      accountId: code.accountId, scope: code.scope, revoked: false };
+      accountId: code.accountId, scope: code.scope };
     signIn(session, at);
     d.stores.accountTokens.set(at.token, at);
     d.c.log.event("session.signed_in", { session_id: session.id, client_id: clientId, account: at.accountId,
@@ -46,7 +46,8 @@ export function authorizationCodeGrant(d: TokenDeps): GrantHandler {
 export function refreshTokenGrant(d: TokenDeps): GrantHandler {
   return async ({ form, clientId, jkt }) => {
     const at = d.stores.accountTokens.get(form.refresh_token ?? "");
-    if (!at || at.revoked) throw oauthError("invalid_grant", 400, "unknown or revoked Account Token");
+    // Revocation deletes the Account Token, so an unknown token covers revoked ones too.
+    if (!at) throw oauthError("invalid_grant", 400, "unknown or revoked Account Token");
     // A stolen Account Token is useless with another agent's client assertion (A-20).
     if (at.clientId !== clientId) throw oauthError("invalid_grant", 400, "Account Token was issued to another client");
 

@@ -47,7 +47,6 @@ export interface AccountToken {
   userId: string;
   accountId: string;
   scope: string[];
-  revoked: boolean;
 }
 
 export interface Tip {

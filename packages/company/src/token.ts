@@ -78,7 +78,7 @@ export async function authenticateClient(
 
 /** Issues a DPoP-bound Session Token and builds the spec 4.2 response. */
 export function issueSessionToken(
-  d: Pick<TokenDeps, "c" | "stores">, session: Session, jkt: string, scope: string[],
+  d: Pick<TokenDeps, "c" | "stores">, session: Session, jkt: string, scope: string[] = [],
 ): Record<string, unknown> {
   const token = newOpaqueToken();
   const signedIn = session.accountId !== null;
@@ -120,7 +120,7 @@ function jwtBearerGrant(d: TokenDeps): GrantHandler {
       const s = ownedSession(d.stores, form.session_id, clientId, sub);
       d.c.log.event("session.renewed", { session_id: s.id, client_id: clientId });
       // A renewal through the assertion carries no account access (the Account Token does that).
-      return issueSessionToken(d, { ...s, accountId: null, accountTokenId: null }, jkt, []);
+      return issueSessionToken(d, { ...s, accountId: null, accountTokenId: null }, jkt);
     }
     const session: Session = {
       id: newSessionId(), clientId, userId: sub, accountId: null, accountTokenId: null, ended: false,
@@ -128,7 +128,7 @@ function jwtBearerGrant(d: TokenDeps): GrantHandler {
     };
     d.stores.sessions.set(session.id, session);
     d.c.log.event("session.started", { session_id: session.id, client_id: clientId, user_id: sub, signed_in: false });
-    return issueSessionToken(d, session, jkt, []);
+    return issueSessionToken(d, session, jkt);
   };
 }
 
@@ -151,8 +151,7 @@ export function tokenRoutes(d: TokenDeps, extraGrants: Record<string, GrantHandl
       if (nonce !== undefined) nonceHeader["dpop-nonce"] = nonce;
       let jkt: string;
       try {
-        jkt = await verifyDpop(ctx.req.header("dpop"), "POST", d.c.tokenEndpoint, d.stores.replay,
-          nonce !== undefined ? { nonce } : {});
+        jkt = await verifyDpop(ctx.req.header("dpop"), "POST", d.c.tokenEndpoint, d.stores.replay, { nonce });
       } catch (e) {
         // At the token endpoint, DPoP errors are 400 (spec 4.2, S4 E3).
         throw oauthError((e as DpopError).code ?? "invalid_dpop_proof", 400, (e as Error).message);

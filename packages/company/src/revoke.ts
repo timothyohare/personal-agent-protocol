@@ -22,7 +22,6 @@ export function revokeRoutes(d: TokenDeps): Hono {
       if (at) {
         // Accepted only from the client_id it was issued to (S4 G12, A-46).
         if (at.clientId !== clientId) throw oauthError("invalid_request", 400, "token was issued to another client");
-        at.revoked = true;
         d.stores.accountTokens.delete(at.token);
         let signedOut = 0;
         for (const s of d.stores.sessions.values()) {

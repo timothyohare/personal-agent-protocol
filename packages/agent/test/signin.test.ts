@@ -35,8 +35,7 @@ describe("Direct Sign-In, end to end", () => {
     expect(session).toMatchObject({ signedIn: true, sessionId: before.sessionId, scope: ALL_SCOPES });
     expect(await client.accountToken()).toMatchObject({ scope: ALL_SCOPES });
     const at = (await client.accountToken())!.token;
-    expect(tb.company.stores.accountTokens.get(at)).toMatchObject({ clientId: tb.agent.clientId, accountId: "acct_tipper",
-      revoked: false });
+    expect(tb.company.stores.accountTokens.get(at)).toMatchObject({ clientId: tb.agent.clientId, accountId: "acct_tipper" });
     expect(tb.company.stores.sessions.get(before.sessionId)).toMatchObject({ accountId: "acct_tipper" });
     // The signed-in token is bound to this request's DPoP key.
     expect(tb.company.stores.tokens.get(session.token)!.jkt)

@@ -34,8 +34,8 @@ export function authError(
  * Account Token signs the Session out, and the old signed-in token stops working at once.
  */
 export function currentAuth(token: SessionToken, session: Session): Omit<Auth, "session" | "token"> {
-  const signedIn = token.accountTokenId !== null && session.accountTokenId === token.accountTokenId
-    && session.accountId === token.accountId;
+  // An Account Token belongs to exactly one account, so matching its id is enough.
+  const signedIn = token.accountTokenId !== null && session.accountTokenId === token.accountTokenId;
   return { signedIn, accountId: signedIn ? token.accountId : null, scope: signedIn ? token.scope : [] };
 }
 
@@ -57,7 +57,7 @@ export function requireSessionToken(c: ResolvedConfig, stores: Stores, nonces: N
     try {
       const htu = c.baseUrl + new URL(ctx.req.url).pathname;
       await verifyDpop(ctx.req.header("dpop"), ctx.req.method, htu, stores.replay,
-        { accessToken: value, boundJkt: token.jkt, ...(nonce !== undefined ? { nonce } : {}) });
+        { accessToken: value, boundJkt: token.jkt, nonce });
     } catch (e) {
       const err = e as DpopError;
       c.log.event("api.rejected", { error: err.code, path: ctx.req.path, detail: err.message });

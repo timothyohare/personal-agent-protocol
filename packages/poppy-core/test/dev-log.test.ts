@@ -63,3 +63,25 @@ test("processSink appends to POPPY_LOG_FILE when set", async () => {
   } finally { console.log = orig; }
   expect(readFileSync(file, "utf8")).toBe("one\ntwo\n");
 });
+
+test("redact covers every secret field name", () => {
+  const names = ["access_token", "refresh_token", "account_token", "session_token", "token", "code", "code_verifier",
+    "dpop", "authorization", "assertion", "client_assertion", "d", "password", "proof", "private_key", "csrf"];
+  const out = redact(Object.fromEntries(names.map((n) => [n, "v"]))) as Record<string, string>;
+  expect(Object.values(out).every((v) => v === "[redacted]")).toBe(true);
+  expect(redact({ session_id: "ses_1", scope: "a b" })).toEqual({ session_id: "ses_1", scope: "a b" });
+});
+
+test("logger prints non-string values as JSON", () => {
+  const lines: string[] = [];
+  createLogger("x", (l) => lines.push(l)).event("e", { n: 1, o: { a: 1 }, l: ["a"] });
+  expect(lines).toEqual(['[x] e n=1 o={"a":1} l=["a"]']);
+});
+
+test("processSink prints to the console", async () => {
+  const { processSink } = await import("../src/index.ts");
+  const seen: unknown[] = [];
+  const orig = console.log; console.log = (x: unknown) => seen.push(x);
+  try { processSink({})("hello"); } finally { console.log = orig; }
+  expect(seen).toEqual(["hello"]);
+});
