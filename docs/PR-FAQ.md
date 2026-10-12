@@ -21,7 +21,7 @@
 - sign-in on the company's own page, using PKCE, with a consent screen that lists each permission
 - tokens bound to a key the agent holds (DPoP), so a stolen token is useless
 
-The agent can be driven by an LLM, which never sees a token. A suite of 24 automated attacks, including replayed proofs, swapped keys, hijacked sessions and mixed-up sign-in responses, shows each one being refused.
+The agent can be driven by an LLM, which never sees a token. A suite of 29 automated attacks, including replayed proofs, swapped keys, hijacked sessions and mixed-up sign-in responses, shows each one being refused.
 
 "I wanted to understand Poppy by building it, not by reading about it," said Tim O'Hare, who built the demo. "The interesting part isn't the happy path. It's watching a copied token fail because the attacker doesn't have the key, and seeing exactly which line of code stopped it."
 
@@ -81,7 +81,7 @@ A:
 **Q: How will we know it worked?**
 A: Each item is backed by a gate that fails if the claim is false:
 - All six milestones pass [HowToVerify.md](HowToVerify.md).
-- All 24 attacks fail closed.
+- All 29 v1 attacks fail closed.
 - The mutation score is at least 80% on the auth code.
 - A cold-start live demo runs in under 10 minutes.
 

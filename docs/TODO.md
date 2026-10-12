@@ -102,7 +102,7 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 
 **Acceptance criteria:**
 - [ ] `npm run lint`, `npm run typecheck`, `npm test` and `npm run build` exist and pass on a smoke test.
-- [ ] `package.json` sets `"engines": { "node": ">=24" }`, and `.nvmrc` contains `24`.
+- [ ] `package.json` sets `"engines": { "node": ">=24" }` and `"type": "module"`, and `.nvmrc` contains `24`. `tsconfig` sets `"erasableSyntaxOnly": true`, so Node 24 can run `.ts` scripts directly (S5 F1).
 - [ ] `.claude/harness.json` binds `lint`, `typecheck`, `build`, `boot`, `ready`, `readyMatch` and `acceptance` (acceptance can be a stub that exits 0 until Task 6).
 
 **Verification:**
@@ -122,6 +122,7 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 - [ ] `verifyDpop` rejects each of these: wrong `typ` or `alg`, a private key in the `jwk` header, `htm` or `htu` mismatch (URL normalised: no query or fragment), `iat` older than 60 s or in the future beyond 5 s skew, a reused `jti`, and an `ath` mismatch.
 - [ ] Assertion verification rejects a wrong `iss`, an array or wrong `aud`, an expired `exp`, a reused `jti`, and a key not in the JWKS.
 - [ ] Every rejection test fails if its check is deleted (`gate-mutation` on `poppy-core`).
+- [ ] Starts from the S5 spike code and its 19 tests ([note](spikes/S5-jose-dpop.md)). The `jti` must be at least 16 characters. The replay store records a `jti` only after every other check passes. `htu` uses the shared `normalizeHtu()`.
 
 **Verification:**
 - [ ] `npm test -w poppy-core` passes.
@@ -144,6 +145,8 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Acceptance criteria:**
 - [ ] Both well-known files and both agent files are served with the right content types and match the briefing examples.
 - [ ] `discover()` rejects a domain mismatch, an issuer mismatch and a missing `poppy_domains` entry (each with a test).
+- [ ] `discover()` follows redirects only to HTTPS URLs, ignores a leading `www.` when matching `organization.domain`, rejects an unsupported **major** `protocol_version`, and ignores unknown fields and extensions (S4 G11).
+- [ ] The OAuth metadata publishes `dpop_signing_alg_values_supported: ["ES256"]` (S5 F3).
 - [ ] `scripts/genkeys.ts` writes the private JWK outside the repo (or to a git-ignored path) and the public JWK with a `kid`.
 
 **Verification:**
@@ -160,7 +163,9 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Acceptance criteria:**
 - [ ] The response body matches spec 4.2 exactly, with `signed_in: false` and `scope: ""`.
 - [ ] The session record stores `session_id`, `client_id`, user ID, account = none and the DPoP thumbprint.
-- [ ] Rejections: `client_id` not HTTPS (unless the dev flag is set), metadata `client_id` mismatch, `jwks_uri` on a different host, a reused assertion `jti`, a missing DPoP proof.
+- [ ] Rejections: `client_id` not HTTPS (unless the dev flag is set), metadata `client_id` mismatch, `jwks_uri` on a different host, a reused assertion `jti`, a missing DPoP proof. Token-endpoint DPoP failures return **400** `invalid_dpop_proof` / `use_dpop_nonce` (S4 E3). The same-host check is deliberately stricter than the spec's same-domain rule (S4 notes).
+- [ ] Session **renewal**: the same grant with `session_id` returns a new signed-out token for that Session. It returns `invalid_session` if the Session ended or belongs to another `client_id` or User ID (S4 G1).
+- [ ] The agent retries once on `use_dpop_nonce` with the `DPoP-Nonce` value, and honours 429 `Retry-After` (S4 G5, G6).
 
 **Verification:**
 - [ ] Integration test: agent → company in-process returns a Session Token.
@@ -177,6 +182,7 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 - [ ] With a valid token and proof, both routes return 200 with fixture data.
 - [ ] Failures return 401 `invalid_token` or `invalid_dpop_proof` with `WWW-Authenticate: DPoP` (F5).
 - [ ] An OpenAPI document at `/openapi.json` describes all routes.
+- [ ] A token in the URL (`?access_token=`) is never accepted (A-42). `call()` never puts tokens in URLs, and handles `use_dpop_nonce` and 429 `Retry-After` (S4 G5–G7).
 
 **Verification:**
 - [ ] Integration tests pass.
@@ -192,6 +198,7 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Acceptance criteria:**
 - [ ] `gate-verify` boots both services, waits for readiness and runs the acceptance script to green.
 - [ ] Each protocol step prints one narrated log line (N6), and no secrets appear in the output (N5).
+- [ ] Any login-form automation lives in `scripts/` (the harness plays the user), never in `packages/agent`. A test greps `packages/agent/src` for form-filling code (spec 4.4, S4 E4).
 
 **Verification:**
 - [ ] `node …/gates/verify.mjs` is green.
@@ -214,6 +221,7 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 - [ ] Mismatched `redirect_uri` and missing or `plain` PKCE are refused, *without* redirecting to the bad URI.
 - [ ] The forms carry CSRF tokens. Pages send `X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors 'none'`.
 - [ ] Unticking a scope leaves it out of the issued code.
+- [ ] A missing, unknown or unavailable `scope` gives `invalid_scope` (A-44). Declining redirects with `error=access_denied` plus `iss` (S4 G3, G4).
 
 **Verification:**
 - [ ] Integration tests drive the forms over HTTP.
@@ -229,12 +237,12 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Description:** The token endpoint handles `authorization_code` with the verifier, `session_id`, client assertion and DPoP proof. It signs in that Session and returns an Account Token plus the signed-in token. The agent builds the authorize URL (PKCE and `state`), opens the browser, and receives the code via the agent-host callback (handed to the CLI over a local loopback or a short poll). It checks `state` and `iss` (F9) and stores the Account Token in the vault.
 
 **Acceptance criteria:**
-- [ ] A code works once only, only with the right verifier, client, redirect URI and `session_id`, and only from the session's DPoP key.
-- [ ] The agent rejects a callback with a wrong `state` or `iss`, and warns when the granted `scope` is narrower than requested.
-- [ ] The Account Token is stored encrypted at rest (OS keychain, or a file encrypted with a local key) and never printed.
+- [ ] A code works once only, only with the right verifier, client, redirect URI and `session_id` (a Session of the same `client_id`). The new Session Token is bound to the key in the exchange request's proof (spec 4.3, S4 E1).
+- [ ] The agent rejects a callback with a wrong `state` or `iss`, handles `error=access_denied`, and warns when the granted `scope` is narrower than requested.
+- [ ] The Account Token **and the per-company DPoP private keys** are stored encrypted at rest (OS keychain, or a file encrypted with a local key) and never printed (S5 F2).
 
 **Verification:**
-- [ ] The acceptance script extends to: sign-in using form automation as the test user.
+- [ ] The acceptance script extends to: sign-in using form automation in `scripts/`, playing the test user (never the agent library; S4 E4).
 - [ ] `gate-verify` is green.
 
 **Dependencies:** 7, 5
@@ -266,7 +274,9 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Description:** The `refresh_token` grant works with and without `session_id` (F10). `POST /oauth/revoke` revokes the Account Token and signs out its sessions. The middleware re-checks the signed-in state on every request (F11). The agent gets `resume` and `signout` commands.
 
 **Acceptance criteria:**
-- [ ] Refresh from a different `client_id` or DPoP key fails with `invalid_grant`.
+- [ ] Refresh from a different `client_id` fails with `invalid_grant`. Refresh with a **new DPoP key** succeeds, and the new token is bound to that key (spec 4.3, 4.8; S4 E1).
+- [ ] A Session signed in to another account gives `account_mismatch` (A-43). `scope` can narrow but not widen. If the Company rotates the `refresh_token`, the agent's vault replaces it (S4 G2, G8, G9).
+- [ ] Revocation needs the client assertion. Revoking from another `client_id` fails and leaves the token valid (A-46, S4 G12).
 - [ ] After revocation, the next `/api/me/tips` call returns 403, and refresh fails.
 
 **Verification:**
@@ -413,6 +423,7 @@ Add the `agent.protocols` entry in `poppy.json`. A worker Lambda replies with a 
 - [ ] A tip submitted through the conversation is identical to one submitted through `POST /api/me/tips`.
 - [ ] No token or `session_id` appears in model input (a test inspects every model call).
 - [ ] An injection in a fixture name or user message doesn't cause an unrequested write (A-26).
+- [ ] No Account Token or Session Token appears in any conversation message (spec 4.8, S4 G10). A person at the company is held to the same scopes as the agent, and after account use a not-signed-in token gets `sign_in_required` (spec 7.11).
 
 **Verification:**
 - [ ] Tests with a stubbed model. HowToVerify M7 is the manual live run.
@@ -492,6 +503,7 @@ With no operator, the conversation times out to `idle` with `responder: agent`.
 **Acceptance criteria:**
 - [ ] The MCP token is rejected at `/api/*`, and DPoP API tokens are rejected at `/mcp`.
 - [ ] A missing or wrong `resource` gives 400 `invalid_target`, and revocation also ends MCP access (A-33 to A-36).
+- [ ] The MCP server publishes protected resource metadata (RFC 9728) whose `authorization_servers` includes `auth.issuer`, and speaks MCP 2025-06-18 or later (spec 6, S4 G13).
 
 **Verification:**
 - [ ] Acceptance stage "mcp". HowToVerify M9.
@@ -584,7 +596,7 @@ The tools reuse the page's existing fetch code (roughly 30 lines). Add `Permissi
 
 ### Checkpoint J: v1.1 complete
 - [ ] `gate-ci --full`, `gate-verify` and `gate-mutation` are green.
-- [ ] `npm run attacks` covers A-01 to A-41.
+- [ ] `npm run attacks` covers A-01 to A-46.
 - [ ] The cloud smoke test passes for both companies, and PR-FAQ.md is updated.
 
 ## Risks and mitigations
@@ -619,3 +631,5 @@ The tools reuse the page's existing fetch code (roughly 30 lines). Add `Permissi
 | 12 Oct 2026 | Stretch scope: Conversation API, MCP server, second company and PACT comparison, all planned in detail above. |
 | 12 Oct 2026 | Added Task 23: the WebMCP build experiment from [poppy-vs-webmcp.md](poppy-vs-webmcp.md). |
 | 12 Oct 2026 | Added Phase 0 spikes S1–S11 and per-task entry spikes. Human actions are tracked in [HUMAN-TODO.md](HUMAN-TODO.md). |
+| 12 Oct 2026 | **Spike S5 done** ([note](spikes/S5-jose-dpop.md)). `jose` 6.2.12 covers DPoP, with 19 tests passing and every check proven by deletion. Applied: ESM plus `erasableSyntaxOnly` (Task 1), replay-last order and `jti` length (Task 2), `dpop_signing_alg_values_supported` (Task 3), DPoP keys in the vault (Task 8). |
+| 12 Oct 2026 | **Spike S4 done** ([note](spikes/S4-spec-checklist.md)). Fixed 4 errors (the Account Token isn't bound to the DPoP key; `invalid_session` for a foreign `session_id`; token-endpoint DPoP errors are 400; sign-in automation stays in the harness) and closed 13 gaps in Tasks 3–10, 16 and 20. Added attacks A-42 to A-46. |

@@ -74,9 +74,9 @@ Tasks 13–23 in [TODO.md](TODO.md#v11-stretch-work).
 | F7 | The authorize endpoint matches `redirect_uri` exactly, requires PKCE S256, shows the agent's `client_name` and host with a checkbox per scope, and redirects with `code`, `state` and `iss`. |
 | F8 | The code exchange requires the verifier, `session_id`, the client assertion and DPoP, and signs in *that* Session. Codes are single-use and short-lived. |
 | F9 | The agent checks `state` and `iss` on the callback, and checks the granted `scope` after the exchange. |
-| F10 | Refreshing with the Account Token works only for the same `client_id` and DPoP key. With `session_id` it signs in that Session; without it, it starts a new signed-in Session. |
+| F10 | Refreshing with the Account Token works only for the `client_id` it was issued to (authenticated by its client assertion). It isn't tied to a DPoP key: each new Session Token is bound to the key in that request's proof. With `session_id` it signs in that Session (same `client_id` and User ID, and signed out or the same account, otherwise `invalid_session` / `account_mismatch`). Without it, it starts a new signed-in Session. `scope` may narrow, never widen. |
 | F11 | Revoking the Account Token signs the user out immediately. The next API call returns 403. |
-| F12 | The LLM tool returns API results and errors to the model, never tokens, proofs, keys or `session_id`. |
+| F12 | The LLM tool returns API results and errors to the model, never tokens, proofs, keys or `session_id`. Account Tokens never appear in model context, conversation messages, logs or URLs (spec 4.8). |
 
 #### v1.1 functional requirements
 

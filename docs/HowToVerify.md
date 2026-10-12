@@ -113,7 +113,7 @@ Expect the company log to show `refresh → session ses_… signed_in=true`, the
 
 ## M5: Attack tests
 
-**Automated:** `npm run attacks`. It prints a table of A-01 to A-24 (SecurityReview section 5), each showing the expected and actual result. Any unexpected success exits non-zero. It also runs inside `gate-verify`.
+**Automated:** `npm run attacks`. It prints a table of the v1 attacks, A-01 to A-24 and A-42 to A-46 (SecurityReview section 5), each showing the expected and actual result. Any unexpected success exits non-zero. It also runs inside `gate-verify`.
 
 **Manual spot checks** (with `--keep` so the app stays up):
 
@@ -150,7 +150,7 @@ Once Task 13 lands, `.claude/harness.json` adds `"mockAws": "dynamodb-local"`, s
 - `mcp`
 - `two-companies`
 
-`npm run attacks` grows to cover A-01 to A-40.
+`npm run attacks` grows to cover A-01 to A-46.
 
 ### Cloud smoke test (Tasks 14 onward)
 
