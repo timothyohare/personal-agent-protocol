@@ -146,7 +146,12 @@ Each attack is an automated test with an exact expected result. Briefing milesto
 ## 7. Sign-off checklist (Checkpoint D)
 
 - [x] Every v1 attack (A-01 to A-20, A-23, A-24, A-40 and A-42 to A-46) is automated and passing, both in-process (`packages/company/test/attacks.test.ts`) and against the booted services (`npm run attacks`, run by `gate-verify`): **28/28 fail closed**. A-21 is covered by the chat-agent test (Task 12) and A-22 by `scripts/check-logs.ts` (the `gate-verify` observability step). For v1.1, A-25 to A-41 are still to do.
-- [ ] `gate-mutation` is at least 80% on `poppy-core` and on the company's `middleware`, `token` and `authorize` modules, with no surviving mutants in a check listed in section 4. *(Result pending; see the re-review below.)*
+- [x] `gate-mutation` is at least 80% on `poppy-core` and on the company's `middleware`, `token` and `authorize` modules. **Run of 12 Oct 2026 (commit `0dde3bd`): 95.8% overall.** By module: `authorize` 96.8, `grants` 98.2, `middleware` 94.5, `revoke` 85.7, `token` 94.9, `verifyAgent` 95.4, `dpop` 93.8, `assertions` 100. *No surviving mutants in a section 4 check, with three exceptions for Tim to accept:*
+  1. `token.resource !== undefined` in the middleware (rejecting MCP Bearer tokens at `/api/*`) can't be tested until Task 20 issues such tokens (A-33).
+  2. The "private key in header" DPoP check survives because `jose` already rejects it. It's a deliberate second layer (S5).
+  3. `a === 100 → true` in the blocked-address check *over*-blocks (fails closed). A test for public `203.64.x.x` addresses now pins it.
+
+  The other survivors are equivalent mutants (a `typeof` check already implied by the next check, regex anchors on strings that `isIP` or the URL parser have already validated, `??` defaults on fields that are always present) or log and description text with no security effect.
 - [x] `algorithms` is pinned to ES256 at every `jwtVerify` call site (grep): there are two, `poppy-core/src/dpop.ts` and `poppy-core/src/assertions.ts`, and both pin it.
 - [x] The dev localhost flag is refused when `NODE_ENV=production` (test in `poppy-core/test/dev-log.test.ts`).
 - [x] The log redaction test (A-22) passes against the acceptance run (`check-logs: ✓ 266 lines, no secrets`).
