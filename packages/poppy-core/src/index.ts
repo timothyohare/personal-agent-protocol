@@ -3,3 +3,6 @@ export * from "./replay.ts";
 export * from "./errors.ts";
 export * from "./dpop.ts";
 export * from "./assertions.ts";
+export * from "./dev.ts";
+export * from "./log.ts";
+export * from "./fetchRouter.ts";

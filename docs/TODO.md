@@ -143,14 +143,14 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Description:** The company serves `poppy.json` and the OAuth metadata (briefing 9.3). The agent host serves `agent.json` and `jwks.json` (9.4), with a key-generation script. The agent's `discover(host)` enforces F1.
 
 **Acceptance criteria:**
-- [ ] Both well-known files and both agent files are served with the right content types and match the briefing examples.
-- [ ] `discover()` rejects a domain mismatch, an issuer mismatch and a missing `poppy_domains` entry (each with a test).
-- [ ] `discover()` follows redirects only to HTTPS URLs, ignores a leading `www.` when matching `organization.domain`, rejects an unsupported **major** `protocol_version`, and ignores unknown fields and extensions (S4 G11).
-- [ ] The OAuth metadata publishes `dpop_signing_alg_values_supported: ["ES256"]` (S5 F3).
-- [ ] `scripts/genkeys.ts` writes the private JWK outside the repo (or to a git-ignored path) and the public JWK with a `kid`.
+- [x] Both well-known files and both agent files are served with the right content types and match the briefing examples.
+- [x] `discover()` rejects a domain mismatch, an issuer mismatch and a missing `poppy_domains` entry (each with a test).
+- [x] `discover()` follows redirects only to HTTPS URLs, ignores a leading `www.` when matching `organization.domain`, rejects an unsupported **major** `protocol_version`, and ignores unknown fields and extensions (S4 G11).
+- [x] The OAuth metadata publishes `dpop_signing_alg_values_supported: ["ES256"]` (S5 F3).
+- [x] `scripts/genkeys.ts` writes the private JWK outside the repo (or to a git-ignored path) and the public JWK with a `kid`.
 
 **Verification:**
-- [ ] `npm test -w company -w agent-host -w agent` passes.
+- [x] `npm test -w company -w agent-host -w agent` passes.
 - [ ] Manual: `curl` each URL (see HowToVerify M1).
 
 **Dependencies:** 2
@@ -633,4 +633,4 @@ The tools reuse the page's existing fetch code (roughly 30 lines). Add `Permissi
 | 12 Oct 2026 | Added Phase 0 spikes S1–S11 and per-task entry spikes. Human actions are tracked in [HUMAN-TODO.md](HUMAN-TODO.md). |
 | 12 Oct 2026 | **Spike S5 done** ([note](spikes/S5-jose-dpop.md)). `jose` 6.2.12 covers DPoP, with 19 tests passing and every check proven by deletion. Applied: ESM plus `erasableSyntaxOnly` (Task 1), replay-last order and `jti` length (Task 2), `dpop_signing_alg_values_supported` (Task 3), DPoP keys in the vault (Task 8). |
 | 12 Oct 2026 | **Spike S4 done** ([note](spikes/S4-spec-checklist.md)). Fixed 4 errors (the Account Token isn't bound to the DPoP key; `invalid_session` for a foreign `session_id`; token-endpoint DPoP errors are 400; sign-in automation stays in the harness) and closed 13 gaps in Tasks 3–10, 16 and 20. Added attacks A-42 to A-46. |
-| 13 Oct 2026 | **Tasks 1 and 2 done** (overnight run, Checkpoint 0/A reviews deferred to Tim). Pinned **Vitest 4.1.11, not 5**: Stryker 10.0.0's Vitest runner never sees mutants killed under Vitest 5 (every DPoP mutant "survived", although the tests fail when the mutant is switched on by hand). TypeScript is pinned at 6.0.3 because `typescript-eslint` doesn't support TS 7 yet. Scripts run with plain `node` (S5 F1), so `tsx` isn't needed. `poppy-core` mutation score: 96.2%. |
+| 12 Oct 2026 | **Tasks 1 and 2 done** (overnight run, Checkpoint 0/A reviews deferred to Tim). Pinned **Vitest 4.1.11, not 5**: Stryker 10.0.0's Vitest runner never sees mutants killed under Vitest 5 (every DPoP mutant "survived", although the tests fail when the mutant is switched on by hand). TypeScript is pinned at 6.0.3 because `typescript-eslint` doesn't support TS 7 yet. Scripts run with plain `node` (S5 F1), so `tsx` isn't needed. `poppy-core` mutation score: 96.2%. |

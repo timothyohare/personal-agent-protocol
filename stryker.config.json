@@ -6,7 +6,8 @@
   },
   "mutate": [
     "packages/poppy-core/src/**/*.ts",
-    "!packages/poppy-core/src/index.ts"
+    "!packages/poppy-core/src/index.ts",
+    "!packages/poppy-core/src/fetchRouter.ts"
   ],
   "concurrency": 2,
   "reporters": [

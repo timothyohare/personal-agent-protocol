@@ -3,6 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "test": "vitest run --root ../.. --project agent" }
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project agent"
+  },
+  "dependencies": {
+    "jose": "6.2.12",
+    "poppy-core": "0.1.0"
+  },
+  "devDependencies": {
+    "company": "0.1.0"
+  }
 }
