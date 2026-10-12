@@ -1,0 +1,28 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+.aws-sam/
+coverage/
+reports/
+
+# Secrets: never commit keys, vaults or env files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+keys/
+**/private*.jwk
+**/*.private.json
+.vault/
+vault*.json
+
+# Throwaway spike code (notes live in docs/spikes/)
+spikes/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.log
