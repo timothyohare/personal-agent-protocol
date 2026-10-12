@@ -14,35 +14,44 @@
 | The tests catch regressions | `node $GATES/mutation.mjs` | Score ≥ 80%, and no survivors in the checks listed in SecurityReview section 4 |
 | How the harness resolved commands | `node $GATES/resolve-cli.mjs --json` | Every key resolved |
 
-Planned `.claude/harness.json` (created in Task 1):
+The project's `.claude/harness.json` (created in Task 1, filled in through Task 11):
 
 ```json
 {
   "lint": "npm run lint",
   "typecheck": "npm run typecheck",
+  "test": "npm test",
   "build": "npm run build",
   "boot": "npm run dev:local",
-  "ready": "http://localhost:8787/.well-known/poppy.json",
-  "readyMatch": "protocol_version",
+  "ready": "http://localhost:8788/agent.json",
   "acceptance": "npm run acceptance && npm run attacks",
-  "mutation": "npx stryker run",
-  "env": { "POPPY_DEV_ALLOW_HTTP_LOCALHOST": "1", "NODE_ENV": "development" }
+  "mutation": "npm run mutation",
+  "observability": "node scripts/check-logs.ts",
+  "env": { "POPPY_LOG_FILE": ".logs/verify.log" }
 }
 ```
 
-Local ports: company `http://localhost:8787`, agent host `http://localhost:8788`. From Task 14 on, the public demo runs on AWS Lambda behind CloudFront (`https://tipping.ohare.id.au`, `https://agent.ohare.id.au`, later `https://stats.ohare.id.au`), and the dev flag is **never** set there.
+`npm run dev:local` sets the dev flag itself and runs everything in one process:
+- company: `http://localhost:8787`
+- agent host: `http://localhost:8788`
+- a hostile second agent host for the attack suite: `http://localhost:8789`
+
+It generates the agent signing keys into the git-ignored `keys/` on first run. The local CLI is `npm run agent:local -- <command>` (it sets the dev flag), and its vault is the git-ignored `.vault/`. Test users: `tipper` / `correct horse battery staple`, and `rival` / `battery staple horse correct`.
+
+From Task 14 on, the public demo runs on AWS Lambda behind CloudFront (`https://tipping.ohare.id.au`, `https://agent.ohare.id.au`, later `https://stats.ohare.id.au`), and the dev flag is **never** set there.
 
 ## M1: Static files
 
-**Automated:** `npm test -w company -w agent-host -w agent` (discovery tests, including the 3 rejection cases).
+**Automated:** `npm test` (discovery tests in `packages/agent/test/discover.test.ts`, including the rejection cases).
 
-**Manual:**
+**Manual (local; swap in the public hosts after Task 14):**
 
 ```bash
-curl -s https://tipping.ohare.id.au/.well-known/poppy.json | jq .
-curl -s https://tipping.ohare.id.au/.well-known/oauth-authorization-server | jq .
-curl -s https://agent.ohare.id.au/agent.json | jq .
-curl -s https://agent.ohare.id.au/jwks.json | jq '.keys[] | {kty, crv, kid, has_private: has("d")}'
+npm run dev:local     # in another terminal
+curl -s localhost:8787/.well-known/poppy.json | jq .
+curl -s localhost:8787/.well-known/oauth-authorization-server | jq .
+curl -s localhost:8788/agent.json | jq .
+curl -s localhost:8788/jwks.json | jq '.keys[] | {kty, crv, kid, has_private: has("d")}'
 ```
 
 Expect:
@@ -52,75 +61,66 @@ Expect:
 
 ## M2: Signed-out session
 
-**Automated:** `node $GATES/verify.mjs` (acceptance stage "session" and "fixtures").
+**Automated:** `node $GATES/verify.mjs` (acceptance stage `signed-out`).
 
 **Manual:**
 
 ```bash
-npm run agent -- discover tipping.ohare.id.au
-npm run agent -- fixtures
+npm run agent:local -- discover
+npm run agent:local -- fixtures
 ```
 
-Expect these narrated log lines, and no token values:
+Expect these narrated lines (the agent's on stderr, the company's in the `dev:local` terminal), and no token values:
 
 ```
-[agent] discovered Tipping Co (issuer https://tipping.ohare.id.au)
-[agent] user id for issuer: loaded (random, per-company)
-[company] verified agent https://agent.ohare.id.au/agent.json (kid …)
-[company] session ses_… started, signed_in=false, dpop jkt=…
-[agent] GET /api/fixtures → 200 (5 fixtures)
+[agent] discovered domain=localhost:8787 issuer=http://localhost:8787 name=Tipping Co
+[agent] session.started company=http://localhost:8787 session_id=ses_… signed_in=false
+[agent] api.call method=GET path=/api/fixtures status=200
+[company] agent.verified client_id=http://localhost:8788/agent.json client_name=Tim's Agent
+[company] session.started session_id=ses_… client_id=http://localhost:8788/agent.json user_id=u_… signed_in=false
 ```
-
-Spot-check the token response shape (debug flag prints keys only): `access_token, token_type=DPoP, expires_in, scope="", session_id, signed_in=false`.
 
 ## M3: Direct Sign-In and writing a tip
 
-**Automated:** acceptance stages "sign-in" (form automation as `test@tipping.example`) and "tips".
+**Automated:** acceptance stages `sign-in` and `tips`. The harness plays the user with `test-support/browser.ts`, never with the agent library.
 
 **Manual (real browser):**
 
-1. Run `npm run agent -- tips`. Expect `403 sign_in_required`, and the agent offers to sign in.
-2. Accept. The browser opens the authorize page. Check:
+1. Run `npm run agent:local -- tips`. The agent says the call needs sign-in, and prints an authorize URL.
+2. Open the URL in your browser. Check:
    - The login form is shown first.
-   - The consent page shows **"Tim's Agent"** *and* the host **agent.ohare.id.au**.
-   - Each of `poppy:read`, `poppy:write` and `standings` has its own checkbox.
-3. Untick `standings` and approve. The agent reports the granted scope without `standings`.
-4. Run `npm run agent -- tip --round 32 --team Storm`. Expect `201`.
-5. Run `npm run agent -- tips`. The new tip is listed.
-6. Run `npm run agent -- score`. Expect `403 insufficient_scope (standings)`.
+   - The consent page shows **"Tim's Agent"** *and* the host **localhost:8788** (later **agent.ohare.id.au**).
+   - Each of `poppy:read`, `poppy:write` and `standings` has its own checkbox, with a description.
+3. Untick `standings` and approve. The browser passes through the agent host's callback page to the CLI's loopback listener, and the CLI prints your tips. (If your browser blocks that hop, paste the final URL into the CLI. This is what spike S3 checks.)
+4. Run `npm run agent:local -- tip storm`. Expect the saved tip (`201`).
+5. Run `npm run agent:local -- tips`. The new tip is listed, without signing in again (the Account Token is in the vault).
+6. Run `npm run agent:local -- score`. Expect `You haven't allowed the "standings" scope`.
 7. Check the headers:
 
    ```bash
-   curl -sI "https://tipping.ohare.id.au/oauth/authorize?…" | grep -iE 'x-frame-options|content-security-policy'
+   curl -s -D - -o /dev/null "localhost:8787/oauth/authorize?client_id=http://localhost:8788/agent.json&redirect_uri=http://localhost:8788/oauth/callback&response_type=code&scope=poppy:read&state=s&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256" | grep -iE 'x-frame-options|content-security-policy|permissions-policy'
    ```
 
-   Expect `DENY` and `frame-ancestors 'none'`.
+   Expect `DENY`, `frame-ancestors 'none'` and `tools=()`.
 
 ## M4: Account Token reuse and revocation
 
-**Automated:** acceptance stage "lifecycle".
+**Automated:** acceptance stage `resume-signout`.
 
-**Manual:**
+**Manual** (each CLI run is a new process, so it starts with no Session):
 
 ```bash
-npm run agent -- session --drop      # forget the Session Token (keep the Account Token)
-npm run agent -- tips                # resumes signed-in via refresh, no browser → 200
-npm run agent -- signout             # revokes the Account Token
-npm run agent -- tips                # → 403 sign_in_required
+npm run agent:local -- status     # session: null, account_token: stored
+npm run agent:local -- tips       # resumes signed in from the Account Token, no browser → tips
+npm run agent:local -- signout    # revokes the Account Token
+npm run agent:local -- tips       # → asks you to sign in again
 ```
 
-Expect the company log to show `refresh → session ses_… signed_in=true`, then `revoked account token; signed out 1 session`.
+Expect the company log to show `session.refreshed … new_session=true`, then `account_token.revoked … sessions_signed_out=N`.
 
 ## M5: Attack tests
 
-**Automated:** `npm run attacks`. It prints a table of the v1 attacks, A-01 to A-24 and A-42 to A-46 (SecurityReview section 5), each showing the expected and actual result. Any unexpected success exits non-zero. It also runs inside `gate-verify`.
-
-**Manual spot checks** (with `--keep` so the app stays up):
-
-```bash
-node $GATES/verify.mjs --keep
-npm run agent -- debug replay-last   # resend the last request byte for byte → 401 invalid_dpop_proof
-```
+**Automated:** `npm run attacks` (with `npm run dev:local` running). It prints a table of the 28 automated v1 attacks (SecurityReview section 5), each with the expected and observed result. Any unexpected success exits non-zero. It also runs inside `gate-verify`. You can run single attacks: `npm run attacks -- A-01 A-05`.
 
 Then open SecurityReview section 7 and tick each item, with evidence.
 
