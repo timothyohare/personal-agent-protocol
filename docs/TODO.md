@@ -179,14 +179,14 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Description:** API middleware (briefing 9.6 steps 1–4), plus `/api/fixtures` and `/api/ladder` with seed NRL data. The agent's `call(method, path, body)` signs a fresh proof per request and handles a `DPoP-Nonce` retry if one is sent.
 
 **Acceptance criteria:**
-- [ ] With a valid token and proof, both routes return 200 with fixture data.
-- [ ] Failures return 401 `invalid_token` or `invalid_dpop_proof` with `WWW-Authenticate: DPoP` (F5).
-- [ ] An OpenAPI document at `/openapi.json` describes all routes.
-- [ ] A token in the URL (`?access_token=`) is never accepted (A-42). `call()` never puts tokens in URLs, and handles `use_dpop_nonce` and 429 `Retry-After` (S4 G5–G7).
+- [x] With a valid token and proof, both routes return 200 with fixture data.
+- [x] Failures return 401 `invalid_token` or `invalid_dpop_proof` with `WWW-Authenticate: DPoP` (F5).
+- [x] An OpenAPI document at `/openapi.json` describes all routes.
+- [x] A token in the URL (`?access_token=`) is never accepted (A-42). `call()` never puts tokens in URLs, and handles `use_dpop_nonce` and 429 `Retry-After` (S4 G5–G7).
 
 **Verification:**
-- [ ] Integration tests pass.
-- [ ] Manual: `npm run agent -- fixtures` prints fixtures.
+- [x] Integration tests pass.
+- [x] Manual: `npm run agent -- fixtures` prints fixtures. (Locally it's `npm run agent:local -- fixtures`, which sets the dev flag; checked against `npm run dev:local` on 12 Oct.)
 
 **Dependencies:** 4
 **Files:** `packages/company/src/{middleware,api/public,openapi}.ts`, `packages/agent/src/call.ts`, `packages/agent/src/cli.ts`

@@ -1,4 +1,7 @@
 import { Hono } from "hono";
+import { publicApi } from "./api/public.ts";
+import { requireSessionToken, type AuthEnv } from "./middleware.ts";
+import { openApi } from "./openapi.ts";
 import { resolveConfig, type CompanyConfig, type ResolvedConfig } from "./config.ts";
 import { NonceManager, RateLimiter } from "./limits.ts";
 import { memoryStores, type Stores } from "./stores.ts";
@@ -30,5 +33,11 @@ export function createCompany(config: CompanyConfig, opts: CompanyOptions = {}):
   const app = new Hono();
   app.route("/", wellKnownRoutes(c));
   app.route("/", tokenRoutes(deps));
+  app.get("/openapi.json", (ctx) => ctx.json(openApi(c)));
+
+  const api = new Hono<AuthEnv>();
+  api.use("/api/*", requireSessionToken(c, stores, deps.nonces));
+  api.route("/", publicApi());
+  app.route("/", api);
   return { app, config: c, stores };
 }

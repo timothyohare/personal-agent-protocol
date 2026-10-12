@@ -18,7 +18,8 @@
     "attacks": "node scripts/attacks.ts",
     "genkeys": "node scripts/genkeys.ts",
     "agent": "node packages/agent/src/cli.ts",
-    "mutation": "stryker run"
+    "mutation": "stryker run",
+    "agent:local": "POPPY_DEV_ALLOW_HTTP_LOCALHOST=1 node packages/agent/src/cli.ts"
   },
   "devDependencies": {
     "@stryker-mutator/core": "10.0.0",

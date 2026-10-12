@@ -5,3 +5,4 @@ export * from "./vault.ts";
 export * from "./userIds.ts";
 export * from "./wwwAuth.ts";
 export * from "./company.ts";
+export * from "./config.ts";
