@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 const src = (p: string) => fileURLToPath(new URL(`./packages/${p}`, import.meta.url));
-const pkg = (name: string) => ({ extends: true, test: { name, include: [`packages/${name}/test/**/*.test.ts`] } });
+const pkg = (name: string) => ({ extends: true as const, test: { name, include: [`packages/${name}/test/**/*.test.ts`] } });
 
 export default defineConfig({
   resolve: {
