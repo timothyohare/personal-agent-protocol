@@ -131,7 +131,8 @@ Then open SecurityReview section 7 and tick each item, with evidence.
 **Manual:**
 
 ```bash
-ANTHROPIC_API_KEY=… npm run chat
+npm run dev:local            # in another terminal
+ANTHROPIC_API_KEY=… npm run chat:local
 > What are this round's NRL fixtures?
 > Tip the Storm to win this round.
 ```
@@ -139,7 +140,7 @@ ANTHROPIC_API_KEY=… npm run chat
 Expect:
 - The fixtures are answered without asking for sign-in.
 - The tip request triggers a sign-in prompt in the browser (if signed out), then a **confirmation question before the POST**.
-- `npm run chat -- --dump-transcript` shows no `eyJ`, `ses_`, `code=` or JWK `"d"` values.
+- `npm run chat:local -- --dump-transcript` (quit with Ctrl-D) shows no `eyJ`, `ses_`, `code=` or JWK `"d"` values.
 
 ## v1.1 additions (Tasks 13–22)
 

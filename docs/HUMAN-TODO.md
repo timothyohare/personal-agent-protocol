@@ -19,12 +19,13 @@ When an item is done, tick it and add the date. If it changes the plan, add a li
 
 | ✓ | Action | Unblocks | How / notes |
 |---|---|---|---|
-| [ ] | Review the `poppy-core` API | Checkpoint A | Read `packages/poppy-core/src/*.ts` and the mutation-testing report |
+| [ ] | Review the `poppy-core` API | Checkpoint A | Read `packages/poppy-core/src/*.ts` and the mutation-testing report (`npm run mutation`, about 30 minutes; the report lands in `reports/mutation/`) |
+| [ ] | **Catch up on the overnight run (12–13 Oct):** Tasks 1–12 were built without the Checkpoint 0, A, B and C reviews | Checkpoints 0–D | Start with the TODO.md decisions log, then `npm run dev:local` plus `npm run agent:local -- tip storm` for a manual sign-in in your browser (HowToVerify M3) |
 | [ ] | Check a secret store is available for the agent's vault (Linux: GNOME Keyring or KWallet via libsecret) | Task 8 | If neither is available, approve the fallback: a key file with 0600 permissions |
 | [ ] | **Manual sign-in in a real browser** (HowToVerify M3) | Checkpoint C | Includes checking the consent page shows the agent's host as well as its name (SecurityReview T-11) |
 | [ ] | **Security sign-off** (SecurityReview section 7) | Checkpoint D | The v1 sign-off is yours. Claude provides the evidence. |
 | [ ] | Create an Anthropic API key for the demo, with a spend limit set in the console | Spike S6, Task 12 | Store it in your shell's secret manager or `.env.local` (git-ignored). Never paste it into chat. |
-| [ ] | **Spike S6** review: approve LangGraph, or switch to the Claude Agent SDK fallback | Task 12 | |
+| [ ] | **Spike S6** review: approve LangGraph, or switch to the Claude Agent SDK fallback | Task 12 | The mechanics pass with a scripted model ([note](spikes/S6-langgraph.md)), and Task 12 is built on them. Only the live Claude run is missing: with the API key set, run `npm run dev:local`, then `ANTHROPIC_API_KEY=… npm run chat:local` (HowToVerify M6). |
 | [ ] | Run the live LLM demo (HowToVerify M6) and confirm it asks before submitting a tip | Checkpoint E | |
 | [ ] | Rehearse the full demo from a cold start (target: under 10 minutes) | Checkpoint E | PRD success metric |
 | [ ] | Review checkpoints A–E | Each phase | Claude pastes the gate output, and you approve moving on |

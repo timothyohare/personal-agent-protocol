@@ -58,7 +58,7 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 
 **Order:**
 1. Before Task 1: S4, then S5 and S3.
-2. Before Task 12: S6.
+2. Before Task 12: S6 (**mechanics done 12 Oct; the live Claude check waits for an API key**).
 3. Before Task 14: S9, S1 and S2, together as about one day of AWS work.
 4. As later tasks start: S7, S8, S10 and S11.
 
@@ -321,13 +321,15 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Description:** Wrap the agent library as a tool `poppy_call(company, method, path, body)` that handles discovery, sessions, sign-in prompts and retries. Build a small LangGraph (TS) chat agent with `@langchain/anthropic` on `claude-sonnet-5-5` that can answer "what are this round's fixtures?" and "tip the Storm this round".
 
 **Acceptance criteria:**
-- [ ] The tool's output contains only the API status and body, or an error code. A test checks that no token, proof, key, code or `session_id` appears in any tool output or model message (F12).
-- [ ] Sign-in needs the user's action in the browser. The model can't complete it.
-- [ ] Prompt-injection test: a fixture name containing instructions doesn't cause a write the user didn't request (SecurityReview T-15).
+- [x] The tool's output contains only the API status and body, or an error code. A test checks that no token, proof, key, code or `session_id` appears in any tool output or model message (F12).
+- [x] Sign-in needs the user's action in the browser. The model can't complete it.
+- [x] Prompt-injection test: a fixture name containing instructions doesn't cause a write the user didn't request (SecurityReview T-15).
 
 **Verification:**
-- [ ] Unit tests use a stubbed model. A recorded live run is checked manually.
-- [ ] `gate-ci` is green.
+- [x] Unit tests use a stubbed model. *A recorded live run is checked manually:* **waiting for an Anthropic API key** (HUMAN-TODO).
+- [x] `gate-ci` is green.
+
+*Built 12 Oct with S6's mechanics (live Claude still unchecked).* The graph is `model → confirm → tools → model`. The `confirm` node holds only `interrupt()` calls, so a resume re-runs nothing else (S6 F1). Every `POST` waits for the user's yes in the terminal, so the A-21 test scripts the model to fall for an injected instruction and shows the gate stops the write anyway. `npm run chat:local` runs it against `dev:local`.
 
 **Dependencies:** 10
 **Files:** `packages/agent/src/{tool,chat}.ts`, tests
@@ -641,3 +643,5 @@ The tools reuse the page's existing fetch code (roughly 30 lines). Add `Permissi
 | 12 Oct 2026 | **Spike S4 done** ([note](spikes/S4-spec-checklist.md)). Fixed 4 errors (the Account Token isn't bound to the DPoP key; `invalid_session` for a foreign `session_id`; token-endpoint DPoP errors are 400; sign-in automation stays in the harness) and closed 13 gaps in Tasks 3–10, 16 and 20. Added attacks A-42 to A-46. |
 | 12 Oct 2026 | **Tasks 1 and 2 done** (overnight run, Checkpoint 0/A reviews deferred to Tim). Pinned **Vitest 4.1.11, not 5**: Stryker 10.0.0's Vitest runner never sees mutants killed under Vitest 5 (every DPoP mutant "survived", although the tests fail when the mutant is switched on by hand). TypeScript is pinned at 6.0.3 because `typescript-eslint` doesn't support TS 7 yet. Scripts run with plain `node` (S5 F1), so `tsx` isn't needed. `poppy-core` mutation score: 96.2%. |
 | 12 Oct 2026 | **Tasks 3 and 4 done.** Pulled the agent vault forward from Task 8, because Task 4 already needs per-issuer User IDs and DPoP keys to persist: `FileVault` is AES-256-GCM with a separate 0600 key file (the HUMAN-TODO fallback; an OS keychain can replace it). The token endpoint checks the DPoP proof **before** client authentication, so a nonce retry doesn't burn the agent's assertion `jti`s. Shared in-process wiring lives in `test-support/testbed.ts`. |
+| 12 Oct 2026 | **Spike S6, partly done** ([note](spikes/S6-langgraph.md)). The LangGraph mechanics pass with a scripted model: tool calls, an `interrupt()` before writes, and no secrets in model input. Live Claude is untested because there's no API key yet. Finding F1: a resume re-runs the whole interrupted node, so confirmation gets its own node. Task 12 was built on this; Tim to approve LangGraph after the live run. |
+| 12 Oct 2026 | **Tasks 5–12 built overnight** without the checkpoint reviews (B, C, D), which wait for Tim. Mutation testing now also covers `company/src/{middleware,token,authorize,grants,revoke,verifyAgent}.ts`. |

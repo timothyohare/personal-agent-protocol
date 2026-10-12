@@ -9,3 +9,4 @@ export * from "./config.ts";
 export * from "./loopback.ts";
 export * from "./agent.ts";
 export * from "./tool.ts";
+export * from "./chat.ts";

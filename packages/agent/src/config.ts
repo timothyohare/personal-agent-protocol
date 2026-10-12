@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { JWK } from "jose";
 import { createLogger, devAllowHttpLocalhost, type Logger } from "poppy-core";
+import { PoppyAgent } from "./agent.ts";
 import { CompanyClient } from "./company.ts";
 import { loadIdentity } from "./identity.ts";
 import { FileVault } from "./vault.ts";
@@ -27,10 +28,16 @@ export function agentConfigFromEnv(env: Record<string, string | undefined> = pro
   };
 }
 
-export async function clientFromConfig(cfg: AgentEnvConfig, log: Logger = createLogger("agent", console.error)) {
+async function depsFromConfig(cfg: AgentEnvConfig, log: Logger) {
   const privateJwk = JSON.parse(readFileSync(resolve(cfg.keysDir, "agent-signing.private.json"), "utf8")) as JWK;
   const identity = await loadIdentity(`${new URL(cfg.agentBaseUrl).origin}/agent.json`, privateJwk);
-  return new CompanyClient(cfg.company, {
-    identity, vault: new FileVault(cfg.vaultPath, cfg.vaultKeyPath), allowHttpLocalhost: cfg.allowHttpLocalhost, log,
-  });
+  return { identity, vault: new FileVault(cfg.vaultPath, cfg.vaultKeyPath), allowHttpLocalhost: cfg.allowHttpLocalhost, log };
+}
+
+export async function clientFromConfig(cfg: AgentEnvConfig, log: Logger = createLogger("agent", console.error)) {
+  return new CompanyClient(cfg.company, await depsFromConfig(cfg, log));
+}
+
+export async function agentFromConfig(cfg: AgentEnvConfig, log: Logger = createLogger("agent", console.error)) {
+  return new PoppyAgent(await depsFromConfig(cfg, log));
 }

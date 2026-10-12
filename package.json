@@ -19,9 +19,12 @@
     "genkeys": "node scripts/genkeys.ts",
     "agent": "node packages/agent/src/cli.ts",
     "mutation": "stryker run",
-    "agent:local": "POPPY_DEV_ALLOW_HTTP_LOCALHOST=1 node packages/agent/src/cli.ts"
+    "agent:local": "POPPY_DEV_ALLOW_HTTP_LOCALHOST=1 node packages/agent/src/cli.ts",
+    "chat": "node packages/agent/src/chat-cli.ts",
+    "chat:local": "POPPY_DEV_ALLOW_HTTP_LOCALHOST=1 node packages/agent/src/chat-cli.ts"
   },
   "devDependencies": {
+    "@langchain/core": "1.2.13",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@types/node": "24.19.2",
