@@ -48,3 +48,18 @@ test("default logger writes to console.log", () => {
   try { createLogger("a").event("e"); } finally { console.log = orig; }
   expect(seen).toEqual(["[a] e"]);
 });
+
+test("processSink appends to POPPY_LOG_FILE when set", async () => {
+  const { mkdtempSync, readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const { processSink } = await import("../src/index.ts");
+  const file = join(mkdtempSync(join(tmpdir(), "poppy-log-")), "x.log");
+  const orig = console.log; console.log = () => {};
+  try {
+    processSink({ POPPY_LOG_FILE: file })("one");
+    processSink({ POPPY_LOG_FILE: file })("two");
+    processSink({})("three");
+  } finally { console.log = orig; }
+  expect(readFileSync(file, "utf8")).toBe("one\ntwo\n");
+});

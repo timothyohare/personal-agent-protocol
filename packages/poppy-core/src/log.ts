@@ -1,3 +1,5 @@
+import { appendFileSync } from "node:fs";
+
 // One-line, human-readable protocol events (N6) that never contain secrets (N5, T-16).
 
 /** Field names whose values are always replaced. Matched case-insensitively. */
@@ -20,6 +22,15 @@ export function redact(value: unknown, key?: string): unknown {
 }
 
 export type LogSink = (line: string) => void;
+
+/** Prints to stdout, and also appends to $POPPY_LOG_FILE when set (scanned by scripts/check-logs.ts). */
+export function processSink(env: Record<string, string | undefined> = process.env): LogSink {
+  const file = env.POPPY_LOG_FILE;
+  return (line) => {
+    console.log(line);
+    if (file) appendFileSync(file, `${line}\n`);
+  };
+}
 
 export interface Logger {
   event(name: string, fields?: Record<string, unknown>): void;

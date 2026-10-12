@@ -196,19 +196,21 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Description:** `npm run dev:local` boots the company (port 8787) and the agent host (port 8788) with the dev flag set. `scripts/acceptance.ts` runs discover → session → fixtures and exits non-zero on any failure. Wire this into `harness.json`.
 
 **Acceptance criteria:**
-- [ ] `gate-verify` boots both services, waits for readiness and runs the acceptance script to green.
-- [ ] Each protocol step prints one narrated log line (N6), and no secrets appear in the output (N5).
-- [ ] Any login-form automation lives in `scripts/` (the harness plays the user), never in `packages/agent`. A test greps `packages/agent/src` for form-filling code (spec 4.4, S4 E4).
+- [x] `gate-verify` boots both services, waits for readiness and runs the acceptance script to green.
+- [x] Each protocol step prints one narrated log line (N6), and no secrets appear in the output (N5).
+- [x] Any login-form automation lives in `scripts/` (the harness plays the user), never in `packages/agent`. A test greps `packages/agent/src` for form-filling code (spec 4.4, S4 E4).
 
 **Verification:**
-- [ ] `node …/gates/verify.mjs` is green.
+- [x] `node …/gates/verify.mjs` is green.
 
 **Dependencies:** 5
-**Files:** `scripts/{dev-local,acceptance}.ts`, `.claude/harness.json`
+**Files:** `scripts/{dev-local,acceptance,check-logs}.ts`, `.claude/harness.json`
+
+*Done 12 Oct:* `harness.json` sets `POPPY_LOG_FILE`, so both services and the acceptance run append to one log, and the `observability` step (`scripts/check-logs.ts`) fails on any JWT or bare 43-character base64url value in it (A-22).
 **Scope:** S
 
 ### Checkpoint B: Milestones 1–2
-- [ ] `gate-ci --full` and `gate-verify` are green.
+- [x] `gate-ci --full` and `gate-verify` are green.
 - [ ] Public HTTPS hosting comes later, in Task 14 (Lambda). Until then the M1 checks run against localhost.
 - [ ] Review with Tim before starting sign-in.
 

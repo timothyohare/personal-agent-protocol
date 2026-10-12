@@ -4,8 +4,11 @@
   "test": "npm test",
   "build": "npm run build",
   "boot": "npm run dev:local",
-  "ready": "http://localhost:8787/.well-known/poppy.json",
-  "readyMatch": "",
+  "ready": "http://localhost:8788/agent.json",
   "acceptance": "npm run acceptance",
-  "mutation": "npm run mutation"
+  "mutation": "npm run mutation",
+  "observability": "node scripts/check-logs.ts",
+  "env": {
+    "POPPY_LOG_FILE": ".logs/verify.log"
+  }
 }
