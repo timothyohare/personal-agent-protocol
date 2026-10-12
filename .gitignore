@@ -26,3 +26,4 @@ vault*.json
 .idea/
 .vscode/
 *.log
+.stryker-tmp/

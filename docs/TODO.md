@@ -16,7 +16,7 @@ Build the minimal Poppy company (Tipping Co) and personal agent from briefing se
 | In-memory stores behind interfaces (`SessionStore`, `ReplayStore`, `CodeStore`, `AccountTokenStore`) | Fast to build. DynamoDB with TTLs can be added later without touching the handlers. |
 | LangGraph (TS) for the LLM loop, on `claude-sonnet-5-5` | Decided 12 Oct 2026. See the decisions log. |
 | Opaque random Session Tokens held in a map | Revocation and the signed-in check apply on every request (briefing 9.6). The spec also allows JWTs, but opaque tokens are simpler to revoke. |
-| Vitest for unit and integration tests. The acceptance script is TypeScript run with `tsx`. | One runner. The acceptance script doubles as the `gate-verify` acceptance command. |
+| Vitest 4 for unit and integration tests. Scripts (acceptance, dev boot) are TypeScript run directly by Node 24. | One runner. The acceptance script doubles as the `gate-verify` acceptance command. |
 | A dev-only localhost HTTP exception, behind an env flag | The tests run without public hosting. The flag is refused in production (SecurityReview T-12). |
 
 ## Dependency graph
@@ -101,13 +101,13 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Description:** Create the npm workspaces repo with four packages, strict TS config, ESLint, Vitest and a `.claude/harness.json`, so the gates work from day one.
 
 **Acceptance criteria:**
-- [ ] `npm run lint`, `npm run typecheck`, `npm test` and `npm run build` exist and pass on a smoke test.
-- [ ] `package.json` sets `"engines": { "node": ">=24" }` and `"type": "module"`, and `.nvmrc` contains `24`. `tsconfig` sets `"erasableSyntaxOnly": true`, so Node 24 can run `.ts` scripts directly (S5 F1).
-- [ ] `.claude/harness.json` binds `lint`, `typecheck`, `build`, `boot`, `ready`, `readyMatch` and `acceptance` (acceptance can be a stub that exits 0 until Task 6).
+- [x] `npm run lint`, `npm run typecheck`, `npm test` and `npm run build` exist and pass on a smoke test.
+- [x] `package.json` sets `"engines": { "node": ">=24" }` and `"type": "module"`, and `.nvmrc` contains `24`. `tsconfig` sets `"erasableSyntaxOnly": true`, so Node 24 can run `.ts` scripts directly (S5 F1).
+- [x] `.claude/harness.json` binds `lint`, `typecheck`, `build`, `boot`, `ready`, `readyMatch` and `acceptance` (acceptance can be a stub that exits 0 until Task 6).
 
 **Verification:**
-- [ ] `node ~/dev/newdev/code-build-harness/harness/gates/ci.mjs --force --full` is green.
-- [ ] `node …/gates/resolve-cli.mjs --json` shows every key resolved.
+- [x] `node ~/dev/newdev/code-build-harness/harness/gates/ci.mjs --force --full` is green.
+- [x] `node …/gates/resolve-cli.mjs --json` shows every key resolved.
 
 **Dependencies:** S4 (Checkpoint 0)
 **Files:** `package.json`, `tsconfig.base.json`, `eslint.config.js`, `vitest.config.ts`, `packages/*/package.json`, `.claude/harness.json`
@@ -119,14 +119,14 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 **Description:** Implement and test `dpopProof`, `verifyDpop`, `clientAssertion`, `sessionAssertion`, `verifyAssertion`, `jwkThumbprint`, `sha256b64url` and a TTL `ReplayStore`. This is the riskiest code, so it goes first.
 
 **Acceptance criteria:**
-- [ ] `verifyDpop` rejects each of these: wrong `typ` or `alg`, a private key in the `jwk` header, `htm` or `htu` mismatch (URL normalised: no query or fragment), `iat` older than 60 s or in the future beyond 5 s skew, a reused `jti`, and an `ath` mismatch.
-- [ ] Assertion verification rejects a wrong `iss`, an array or wrong `aud`, an expired `exp`, a reused `jti`, and a key not in the JWKS.
-- [ ] Every rejection test fails if its check is deleted (`gate-mutation` on `poppy-core`).
-- [ ] Starts from the S5 spike code and its 19 tests ([note](spikes/S5-jose-dpop.md)). The `jti` must be at least 16 characters. The replay store records a `jti` only after every other check passes. `htu` uses the shared `normalizeHtu()`.
+- [x] `verifyDpop` rejects each of these: wrong `typ` or `alg`, a private key in the `jwk` header, `htm` or `htu` mismatch (URL normalised: no query or fragment), `iat` older than 60 s or in the future beyond 5 s skew, a reused `jti`, and an `ath` mismatch.
+- [x] Assertion verification rejects a wrong `iss`, an array or wrong `aud`, an expired `exp`, a reused `jti`, and a key not in the JWKS.
+- [x] Every rejection test fails if its check is deleted (`gate-mutation` on `poppy-core`).
+- [x] Starts from the S5 spike code and its 19 tests ([note](spikes/S5-jose-dpop.md)). The `jti` must be at least 16 characters. The replay store records a `jti` only after every other check passes. `htu` uses the shared `normalizeHtu()`.
 
 **Verification:**
-- [ ] `npm test -w poppy-core` passes.
-- [ ] `node …/gates/mutation.mjs` scores at least 80% on `poppy-core`.
+- [x] `npm test -w poppy-core` passes.
+- [x] `node …/gates/mutation.mjs` scores at least 80% on `poppy-core`.
 
 **Dependencies:** 1
 **Files:** `packages/poppy-core/src/{dpop,assertions,replay,hash}.ts`, `packages/poppy-core/test/*.test.ts`
@@ -633,3 +633,4 @@ The tools reuse the page's existing fetch code (roughly 30 lines). Add `Permissi
 | 12 Oct 2026 | Added Phase 0 spikes S1–S11 and per-task entry spikes. Human actions are tracked in [HUMAN-TODO.md](HUMAN-TODO.md). |
 | 12 Oct 2026 | **Spike S5 done** ([note](spikes/S5-jose-dpop.md)). `jose` 6.2.12 covers DPoP, with 19 tests passing and every check proven by deletion. Applied: ESM plus `erasableSyntaxOnly` (Task 1), replay-last order and `jti` length (Task 2), `dpop_signing_alg_values_supported` (Task 3), DPoP keys in the vault (Task 8). |
 | 12 Oct 2026 | **Spike S4 done** ([note](spikes/S4-spec-checklist.md)). Fixed 4 errors (the Account Token isn't bound to the DPoP key; `invalid_session` for a foreign `session_id`; token-endpoint DPoP errors are 400; sign-in automation stays in the harness) and closed 13 gaps in Tasks 3–10, 16 and 20. Added attacks A-42 to A-46. |
+| 13 Oct 2026 | **Tasks 1 and 2 done** (overnight run, Checkpoint 0/A reviews deferred to Tim). Pinned **Vitest 4.1.11, not 5**: Stryker 10.0.0's Vitest runner never sees mutants killed under Vitest 5 (every DPoP mutant "survived", although the tests fail when the mutant is switched on by hand). TypeScript is pinned at 6.0.3 because `typescript-eslint` doesn't support TS 7 yet. Scripts run with plain `node` (S5 F1), so `tsx` isn't needed. `poppy-core` mutation score: 96.2%. |
