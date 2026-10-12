@@ -11,7 +11,7 @@ Build the minimal Poppy company (Tipping Co) and personal agent from briefing se
 | Decision | Rationale |
 |---|---|
 | npm workspaces monorepo: `poppy-core`, `company`, `agent-host`, `agent` | Shared crypto code is tested once. The packages map onto the briefing's three components. |
-| Hono on Node 22, TypeScript strict, `jose` | Small and typed, and the same code runs on Lambda later. `jose` is what the briefing uses. |
+| Hono on Node 24 LTS, TypeScript strict, `jose` | Small and typed, and the same code runs on Lambda later (`nodejs24.x` runtime, confirmed in Task 14). Node 24 is what's installed locally. `jose` is what the briefing uses. |
 | Hand-rolled authorization server | The point of v1 is to see every check (briefing 9.1). |
 | In-memory stores behind interfaces (`SessionStore`, `ReplayStore`, `CodeStore`, `AccountTokenStore`) | Fast to build. DynamoDB with TTLs can be added later without touching the handlers. |
 | LangGraph (TS) for the LLM loop, on `claude-sonnet-5-5` | Decided 12 Oct 2026. See the decisions log. |
@@ -102,6 +102,7 @@ If a spike fails, take its fallback, update the affected tasks, and tell Tim bef
 
 **Acceptance criteria:**
 - [ ] `npm run lint`, `npm run typecheck`, `npm test` and `npm run build` exist and pass on a smoke test.
+- [ ] `package.json` sets `"engines": { "node": ">=24" }`, and `.nvmrc` contains `24`.
 - [ ] `.claude/harness.json` binds `lint`, `typecheck`, `build`, `boot`, `ready`, `readyMatch` and `acceptance` (acceptance can be a stub that exits 0 until Task 6).
 
 **Verification:**

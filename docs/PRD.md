@@ -106,7 +106,7 @@ Tasks 13–23 in [TODO.md](TODO.md#v11-stretch-work).
 
 | ID | Requirement |
 |---|---|
-| N1 | TypeScript (strict), Node 22 LTS, `jose` for all JWT, JWK and DPoP work. |
+| N1 | TypeScript (strict), Node 24 LTS (locally and on Lambda), `jose` for all JWT, JWK and DPoP work. |
 | N2 | Runs fully locally with one command. From v1.1 (Task 14) it also runs publicly over HTTPS on AWS Lambda function URLs behind CloudFront. |
 | N3 | Storage is in-memory maps behind an interface, so DynamoDB can replace it later. |
 | N4 | Quality gates: `gate-ci` (lint, typecheck, tests, build) and `gate-verify` (boot and run the acceptance flow) must be green. `gate-mutation` runs on the crypto and auth module. |
