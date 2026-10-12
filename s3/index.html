@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>S3 callback test</title>
+<style>
+  :root { color-scheme: light dark; --bg:#fff; --fg:#1a1a1a; --muted:#666; --accent:#0b62d6; --line:#ddd; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#16181c; --fg:#e8e8e8; --muted:#9aa; --accent:#6aa8ff; --line:#333; } }
+  body { font: 16px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); margin: 0; padding: 24px 16px; }
+  main { max-width: 640px; margin: 0 auto; }
+  li { margin: 10px 0; }
+  a { color: var(--accent); }
+  .muted { color: var(--muted); }
+  .err { color: #c62828; font-weight: 600; }
+  code { font-size: 0.9em; }
+  ol { padding-left: 20px; }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 24px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Spike S3: browser callback to the CLI</h1>
+  <p class="muted">Each link plays the company's authorization server, redirecting to the agent host's <code>/oauth/callback</code> with a test code. The callback page then forwards to the CLI listener on <code>127.0.0.1</code>. Only test values are used, and nothing here is a real token.</p>
+  <p id="portinfo"></p>
+  <ol id="variants"></ol>
+  <hr>
+  <p class="muted">For each link, note what the browser does: a smooth redirect, a warning or permission prompt, an error page, or nothing. The listener records every hit it receives.</p>
+</main>
+<script>
+(() => {
+  const port = new URLSearchParams(location.search).get("port");
+  const info = document.getElementById("portinfo");
+  if (!/^\d{4,5}$/.test(port || "")) {
+    info.className = "err";
+    info.textContent = "Open this page using the URL printed by the listener (it adds ?port=…).";
+    return;
+  }
+  info.textContent = `Listener port: ${port}`;
+  const variants = [
+    ["js-replace", "JavaScript location.replace() (the planned design)"],
+    ["meta-refresh", "Meta refresh"],
+    ["form-post", "Auto-submitted form POST (keeps the code out of the URL)"],
+    ["manual-click", "Manual click (fallback)"],
+  ];
+  const ol = document.getElementById("variants");
+  for (const [v, label] of variants) {
+    const nonce = crypto.getRandomValues(new Uint8Array(12)).reduce((s, b) => s + b.toString(16).padStart(2, "0"), "");
+    const p = new URLSearchParams({ code: "TEST-" + v, state: `${nonce}.${port}`, iss: "https://tipping.example", variant: v });
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.href = `callback.html?${p}`;
+    a.textContent = label;
+    li.append(a);
+    ol.append(li);
+  }
+})();
+</script>
+</body>
+</html>

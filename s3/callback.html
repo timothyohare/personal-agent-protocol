@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>S3 agent-host callback</title>
+<style>
+  :root { color-scheme: light dark; --bg:#fff; --fg:#1a1a1a; --muted:#666; --accent:#0b62d6; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#16181c; --fg:#e8e8e8; --muted:#9aa; --accent:#6aa8ff; } }
+  body { font: 16px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); margin: 0; padding: 24px 16px; }
+  main { max-width: 640px; margin: 0 auto; }
+  code { font-size: 0.9em; }
+  .muted { color: var(--muted); }
+  .err { color: #c62828; font-weight: 600; }
+  button, a.btn { font: inherit; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; text-decoration: none; display: inline-block; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Agent host: <code>/oauth/callback</code></h1>
+  <p class="muted">Simulates <code>https://agent.ohare.id.au/oauth/callback</code>. It forwards the sign-in result to the CLI listening on <code>127.0.0.1</code>.</p>
+  <p id="status">Working…</p>
+  <p id="manual" hidden></p>
+</main>
+<script>
+(() => {
+  const q = new URLSearchParams(location.search);
+  const status = document.getElementById("status");
+  const manual = document.getElementById("manual");
+  const fail = (msg) => { status.className = "err"; status.textContent = msg; };
+
+  // state = "<nonce>.<port>": the CLI encodes its loopback port in state (one-time, see TODO.md Task 8).
+  const state = q.get("state") || "";
+  const m = /^([A-Za-z0-9_-]{8,64})\.(\d{4,5})$/.exec(state);
+  if (!m) return fail("Bad or missing state. Not forwarding.");
+  const port = Number(m[2]);
+  if (port < 1024 || port > 65535) return fail("Port out of range. Not forwarding.");
+  const code = q.get("code"), error = q.get("error"), iss = q.get("iss") || "";
+  if (!code && !error) return fail("No code or error. Not forwarding.");
+
+  const variant = q.get("variant") || "js-replace";
+  // Only ever loopback: never an attacker-chosen host (no open redirect).
+  const target = `http://127.0.0.1:${port}/cb`;
+  const params = new URLSearchParams({ variant, state, iss, ...(code ? { code } : { error }) });
+
+  status.textContent = `Forwarding to ${target} using "${variant}"…`;
+  const link = `${target}?${params}`;
+  manual.hidden = false;
+  manual.innerHTML = "";
+  const a = document.createElement("a");
+  a.className = "btn"; a.href = link.replace("variant=" + variant, "variant=manual-click");
+  a.textContent = "Not redirected? Click to finish sign-in";
+  manual.append(a);
+
+  if (variant === "js-replace") {
+    location.replace(link);
+  } else if (variant === "meta-refresh") {
+    const meta = document.createElement("meta");
+    meta.httpEquiv = "refresh"; meta.content = `0;url=${link}`;
+    document.head.append(meta);
+  } else if (variant === "form-post") {
+    // Keeps the code out of the loopback URL and browser history.
+    const f = document.createElement("form");
+    f.method = "POST"; f.action = target;
+    for (const [k, v] of params) { const i = document.createElement("input"); i.type = "hidden"; i.name = k; i.value = v; f.append(i); }
+    document.body.append(f); f.submit();
+  } else if (variant === "manual-click") {
+    status.textContent = "Click the button to finish sign-in.";
+  } else {
+    fail("Unknown variant.");
+  }
+})();
+</script>
+</body>
+</html>
