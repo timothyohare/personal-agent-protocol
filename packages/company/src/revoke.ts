@@ -18,25 +18,18 @@ export function revokeRoutes(d: TokenDeps): Hono {
       const { clientId } = await authenticateClient(form, d);
       if (!form.token) throw oauthError("invalid_request", 400, "token required");
 
-      const at = d.stores.accountTokens.get(form.token);
+      const at = await d.stores.accountTokens.get(form.token);
       if (at) {
         // Accepted only from the client_id it was issued to (S4 G12, A-46).
         if (at.clientId !== clientId) throw oauthError("invalid_request", 400, "token was issued to another client");
-        d.stores.accountTokens.delete(at.token);
-        let signedOut = 0;
-        for (const s of d.stores.sessions.values()) {
-          if (s.accountTokenId === at.id) {
-            s.accountId = null;
-            s.accountTokenId = null;
-            signedOut++;
-          }
-        }
+        await d.stores.accountTokens.delete(at.token);
+        const signedOut = await d.stores.sessions.signOutByAccountToken(at.id);
         d.c.log.event("account_token.revoked", { client_id: clientId, account: at.accountId, sessions_signed_out: signedOut });
       } else {
-        const st = d.stores.tokens.get(form.token);
-        const owner = st ? d.stores.sessions.get(st.sessionId) : undefined;
+        const st = await d.stores.tokens.get(form.token);
+        const owner = st ? await d.stores.sessions.get(st.sessionId) : undefined;
         if (st && owner?.clientId === clientId) {
-          d.stores.tokens.delete(form.token);
+          await d.stores.tokens.delete(form.token);
           d.c.log.event("session_token.revoked", { client_id: clientId, session_id: st.sessionId });
         }
       }

@@ -2,12 +2,20 @@
 import { calculateJwkThumbprint, exportJWK, generateKeyPair, type JWK } from "jose";
 import { createAgentHost } from "agent-host";
 import { CompanyClient, MemoryVault, loadIdentity, type AgentDeps, type Vault } from "agent";
-import { createCompany, tippingCo, type CompanyConfig, type CompanyOptions } from "company";
+import { createCompany, tippingCo, type CompanyConfig, type CompanyOptions, type Table } from "company";
 import { createLogger, fetchRouter, type Handler } from "poppy-core";
 
 export const COMPANY_HOST = "tipping.example";
 export const COMPANY = `https://${COMPANY_HOST}`;
 export const TOKEN_EP = `${COMPANY}/oauth/token`;
+
+/** Changes a stored record in tests (stores hand out copies, so this reads, edits and writes it back). */
+export async function edit<T>(table: Table<T>, id: string, change: (v: T) => void): Promise<void> {
+  const v = await table.get(id);
+  if (v === undefined) throw new Error(`no record ${id}`);
+  change(v);
+  await table.put(id, v);
+}
 
 export async function agentKeys() {
   const kp = await generateKeyPair("ES256", { extractable: true });

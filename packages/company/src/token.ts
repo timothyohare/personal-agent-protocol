@@ -77,16 +77,16 @@ export async function authenticateClient(
 }
 
 /** Issues a DPoP-bound Session Token and builds the spec 4.2 response. */
-export function issueSessionToken(
+export async function issueSessionToken(
   d: Pick<TokenDeps, "c" | "stores">, session: Session, jkt: string, scope: string[] = [],
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   const token = newOpaqueToken();
   const signedIn = session.accountId !== null;
-  d.stores.tokens.set(token, {
+  const expiresAt = Date.now() + d.c.sessionTokenTtlS * 1000;
+  await d.stores.tokens.put(token, {
     token, sessionId: session.id, jkt, accountId: session.accountId, accountTokenId: session.accountTokenId,
-    scope: signedIn ? scope : [],
-    expiresAt: Date.now() + d.c.sessionTokenTtlS * 1000,
-  });
+    scope: signedIn ? scope : [], expiresAt,
+  }, expiresAt);
   return {
     access_token: token,
     token_type: "DPoP",
@@ -98,8 +98,8 @@ export function issueSessionToken(
 }
 
 /** Looks up a Session the caller may use: live, same agent and same User (spec 4.2, 4.8). */
-export function ownedSession(stores: Stores, sessionId: string, clientId: string, userId?: string): Session {
-  const s = stores.sessions.get(sessionId);
+export async function ownedSession(stores: Stores, sessionId: string, clientId: string, userId?: string): Promise<Session> {
+  const s = await stores.sessions.get(sessionId);
   if (!s || s.ended || s.clientId !== clientId || (userId !== undefined && s.userId !== userId)) {
     throw oauthError("invalid_session", 400, "unknown session, or not yours");
   }
@@ -117,7 +117,7 @@ function jwtBearerGrant(d: TokenDeps): GrantHandler {
       throw oauthError("invalid_grant", 400, `session assertion: ${(e as AssertionError).message}`);
     }
     if (form.session_id !== undefined) {
-      const s = ownedSession(d.stores, form.session_id, clientId, sub);
+      const s = await ownedSession(d.stores, form.session_id, clientId, sub);
       d.c.log.event("session.renewed", { session_id: s.id, client_id: clientId });
       // A renewal through the assertion carries no account access (the Account Token does that).
       return issueSessionToken(d, { ...s, accountId: null, accountTokenId: null }, jkt);
@@ -126,7 +126,7 @@ function jwtBearerGrant(d: TokenDeps): GrantHandler {
       id: newSessionId(), clientId, userId: sub, accountId: null, accountTokenId: null, ended: false,
       createdAt: Date.now(),
     };
-    d.stores.sessions.set(session.id, session);
+    await d.stores.sessions.put(session.id, session);
     d.c.log.event("session.started", { session_id: session.id, client_id: clientId, user_id: sub, signed_in: false });
     return issueSessionToken(d, session, jkt);
   };

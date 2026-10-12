@@ -4,18 +4,11 @@ import { FIXTURES } from "../data.ts";
 import { requireScope, type AuthEnv } from "../middleware.ts";
 import type { Stores, Tip } from "../stores.ts";
 
-const tipsOf = (stores: Stores, accountId: string) => {
-  let m = stores.tips.get(accountId);
-  if (!m) stores.tips.set(accountId, m = new Map());
-  return m;
-};
-
 export function meApi(stores: Stores): Hono<AuthEnv> {
   const app = new Hono<AuthEnv>();
 
-  app.get("/api/me/tips", requireScope("poppy:read"), (ctx) => {
-    const tips = [...tipsOf(stores, ctx.get("auth").accountId!).values()].sort((a, b) => a.fixture_id.localeCompare(b.fixture_id));
-    return ctx.json({ tips });
+  app.get("/api/me/tips", requireScope("poppy:read"), async (ctx) => {
+    return ctx.json({ tips: await stores.tips.list(ctx.get("auth").accountId!) });
   });
 
   app.post("/api/me/tips", requireScope("poppy:write"), async (ctx) => {
@@ -30,12 +23,12 @@ export function meApi(stores: Stores): Hono<AuthEnv> {
     if (!team) return bad(`${body.team} isn't playing in ${fixture.id} (${fixture.home} v ${fixture.away})`);
     const auth = ctx.get("auth");
     const tip: Tip = { fixture_id: fixture.id, round: fixture.round, team, submitted_at: new Date().toISOString() };
-    tipsOf(stores, auth.accountId!).set(fixture.id, tip);
+    await stores.tips.put(auth.accountId!, tip);
     return ctx.json(tip, 201);
   });
 
-  app.get("/api/me/score", requireScope("standings"), (ctx) => {
-    const tipped = tipsOf(stores, ctx.get("auth").accountId!).size;
+  app.get("/api/me/score", requireScope("standings"), async (ctx) => {
+    const tipped = (await stores.tips.list(ctx.get("auth").accountId!)).length;
     // No results are recorded for the demo rounds, so the score is a fixed season baseline plus new tips.
     return ctx.json({ season: 2026, correct: 142, tipped: 208 + tipped, position: 37, entrants: 1250 });
   });

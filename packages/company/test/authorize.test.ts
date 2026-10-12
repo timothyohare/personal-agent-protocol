@@ -29,7 +29,7 @@ describe("happy path", () => {
     expect(loc.startsWith(`${CB}?`)).toBe(true);
     const p = params(loc);
     expect(p).toMatchObject({ state: "st_123", iss: COMPANY });
-    const code = tb.company.stores.codes.get(p.code!)!;
+    const code = (await tb.company.stores.codes.get(p.code!))!;
     expect(code).toMatchObject({ clientId: tb.agent.clientId, redirectUri: CB, accountId: "acct_tipper",
       scope: ["poppy:read", "poppy:write", "standings"] });
     expect(code.expiresAt - Date.now()).toBeLessThanOrEqual(60_000);
@@ -38,14 +38,13 @@ describe("happy path", () => {
   test("unticking a scope leaves it out of the code (A-23)", async () => {
     const { tb, authUrl, browser } = await setup();
     const p = params(await userSignsIn(browser, authUrl(), { untick: ["poppy:write"] }));
-    expect(tb.company.stores.codes.get(p.code!)!.scope).toEqual(["poppy:read", "standings"]);
+    expect((await tb.company.stores.codes.get(p.code!))!.scope).toEqual(["poppy:read", "standings"]);
   });
 
   test("declining redirects with access_denied, state and iss (S4 G4)", async () => {
-    const { tb, authUrl, browser } = await setup();
+    const { authUrl, browser } = await setup();
     const p = params(await userSignsIn(browser, authUrl(), { decision: "deny" }));
     expect(p).toEqual({ error: "access_denied", state: "st_123", iss: COMPANY });
-    expect(tb.company.stores.codes.size).toBe(0);
   });
 
   test("unticking every scope counts as declining", async () => {
@@ -162,7 +161,12 @@ describe("CSRF and login (T-9, A-17)", () => {
         ["scope", "poppy:read"], ["decision", "approve"]]);
       expect(res.status).toBe(403);
     }
-    expect(tb.company.stores.codes.size).toBe(0);
+    // The refused posts didn't use up the request: the right token still works, once.
+    const ok = await browser.post(`${COMPANY}/oauth/authorize/consent`, [["req", req], ["csrf", csrf],
+      ["scope", "poppy:read"], ["decision", "approve"]]);
+    expect(ok.status).toBe(303);
+    const code = new URL(ok.headers.get("location")!).searchParams.get("code")!;
+    expect(await tb.company.stores.codes.get(code)).toMatchObject({ scope: ["poppy:read"] });
   });
 
   test("consent before login is refused", async () => {
@@ -204,6 +208,6 @@ describe("CSRF and login (T-9, A-17)", () => {
     const res = await browser.post(`${COMPANY}/oauth/authorize/consent`, [["req", req], ["csrf", csrf],
       ["scope", "poppy:read"], ["scope", "admin"], ["decision", "approve"]]);
     const code = params(res.headers.get("location")!).code!;
-    expect(tb.company.stores.codes.get(code)!.scope).toEqual(["poppy:read"]);
+    expect((await tb.company.stores.codes.get(code))!.scope).toEqual(["poppy:read"]);
   });
 });

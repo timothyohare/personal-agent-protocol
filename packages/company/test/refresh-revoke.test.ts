@@ -35,7 +35,7 @@ describe("refresh_token grant (F10)", () => {
     expect(r.json).toMatchObject({ signed_in: true, scope: "poppy:read poppy:write standings", token_type: "DPoP" });
     expect(r.json.session_id).not.toBe(session.sessionId);
     expect(r.json).not.toHaveProperty("refresh_token");
-    expect(tb.company.stores.sessions.get(r.json.session_id as string)).toMatchObject({ accountId: "acct_tipper" });
+    expect((await tb.company.stores.sessions.get(r.json.session_id as string))).toMatchObject({ accountId: "acct_tipper" });
   });
 
   test("with a session_id that belongs to another User ID: invalid_session", async () => {
@@ -57,7 +57,7 @@ describe("refresh_token grant (F10)", () => {
     const k = await newDpopKey();
     const r = await refresh({}, undefined, k);
     expect(r.status).toBe(200);
-    expect(tb.company.stores.tokens.get(r.json.access_token as string)!.jkt).toBe(await jwkThumbprint(k.publicJwk));
+    expect((await tb.company.stores.tokens.get(r.json.access_token as string))!.jkt).toBe(await jwkThumbprint(k.publicJwk));
   });
 
   test("A-20: refresh with the Account Token from a different client_id is invalid_grant", async () => {
@@ -75,7 +75,7 @@ describe("refresh_token grant (F10)", () => {
     const { refresh, tb } = await setup();
     const narrow = await refresh({ scope: "poppy:read" });
     expect(narrow.json.scope).toBe("poppy:read");
-    expect(tb.company.stores.tokens.get(narrow.json.access_token as string)!.scope).toEqual(["poppy:read"]);
+    expect((await tb.company.stores.tokens.get(narrow.json.access_token as string))!.scope).toEqual(["poppy:read"]);
     expect((await refresh({ scope: "poppy:read admin" })).json.error).toBe("invalid_scope");
     expect((await refresh({ scope: "" })).json.error).toBe("invalid_scope");
   });
@@ -83,7 +83,7 @@ describe("refresh_token grant (F10)", () => {
   test("A-43: refreshing into a Session signed in to a different account is account_mismatch", async () => {
     const { tb, client, refresh } = await setup();
     const { makeUser } = await import("../src/index.ts");
-    tb.company.stores.users.set("other", makeUser("other", "pw"));
+    await tb.company.stores.users.put("other", makeUser("other", "pw"));
     // The same agent and User ID signs a second Session in to another account...
     const s2 = await client.startSession();
     const { TestBrowser, userSignsIn } = await import("../../../test-support/browser.ts");
@@ -91,7 +91,7 @@ describe("refresh_token grant (F10)", () => {
     await client.completeSignIn(await userSignsIn(new TestBrowser(tb.fetch), url, { username: "other", password: "pw" }))
       .catch(() => {});
     // completeSignIn replaced the vault token with the other account's; use the first account's token directly.
-    expect(tb.company.stores.sessions.get(s2.sessionId)!.accountId).toBe("acct_other");
+    expect((await tb.company.stores.sessions.get(s2.sessionId))!.accountId).toBe("acct_other");
     expect(await refresh({ session_id: s2.sessionId })).toMatchObject({ status: 400, json: { error: "account_mismatch" } });
   });
 
@@ -103,7 +103,7 @@ describe("refresh_token grant (F10)", () => {
     await client.resume();
     const second = (await client.accountToken())!.token;
     expect(second).not.toBe(first);
-    expect(tb.company.stores.accountTokens.has(first)).toBe(false);
+    expect(((await tb.company.stores.accountTokens.get(first)) !== undefined)).toBe(false);
     await client.resume();
     expect((await client.accountToken())!.token).not.toBe(second);
   });
@@ -113,8 +113,8 @@ describe("revocation (spec 4.9, F11)", () => {
   test("A-08: after revocation the old signed-in token gets 403 sign_in_required and refresh fails", async () => {
     const { tb, client, session, refresh, revoke } = await setup();
     expect((await revoke()).status).toBe(200);
-    const st = tb.company.stores.tokens.get(session.token)!;
-    expect(tb.company.stores.sessions.get(st.sessionId)!.accountId).toBeNull();
+    const st = (await tb.company.stores.tokens.get(session.token))!;
+    expect((await tb.company.stores.sessions.get(st.sessionId))!.accountId).toBeNull();
     // The agent still holds the revoked Account Token, tries it once, gets invalid_grant and gives up.
     const r = await client.call("GET", "/api/me/tips");
     expect(r).toMatchObject({ status: 403, error: "sign_in_required" });
@@ -150,13 +150,13 @@ describe("revocation (spec 4.9, F11)", () => {
     const { tb, client, revoke } = await setup();
     const resumed = await client.resume();
     await revoke();
-    for (const id of [resumed.sessionId]) expect(tb.company.stores.sessions.get(id)!.accountId).toBeNull();
+    for (const id of [resumed.sessionId]) expect((await tb.company.stores.sessions.get(id))!.accountId).toBeNull();
   });
 
   test("a Session Token can be revoked by its own agent", async () => {
     const { session, revoke, tb } = await setup();
     expect((await revoke({ token: session.token, token_type_hint: "access_token" })).status).toBe(200);
-    expect(tb.company.stores.tokens.has(session.token)).toBe(false);
+    expect(((await tb.company.stores.tokens.get(session.token)) !== undefined)).toBe(false);
   });
 });
 
@@ -184,6 +184,6 @@ describe("agent resume and sign-out (milestone 4)", () => {
     const { tb, vault } = await setup();
     const c = tb.client(vault);
     const s = await c.resume();
-    expect(tb.company.stores.tokens.get(s.token)!.jkt).toBe(await jwkThumbprint((await dpopKeyFor(vault, COMPANY)).publicJwk));
+    expect((await tb.company.stores.tokens.get(s.token))!.jkt).toBe(await jwkThumbprint((await dpopKeyFor(vault, COMPANY)).publicJwk));
   });
 });

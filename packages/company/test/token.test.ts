@@ -4,7 +4,7 @@ import {
   clientAssertion, dpopProof, jwkThumbprint, newDpopKey, PoppyError, rid, sessionAssertion, type SigningKey,
 } from "poppy-core";
 import { GRANT_JWT_BEARER, CLIENT_ASSERTION_TYPE } from "../src/index.ts";
-import { TOKEN_EP, testbed } from "../../../test-support/testbed.ts";
+import { TOKEN_EP, edit, testbed } from "../../../test-support/testbed.ts";
 
 const USER = "u_testuser0000000";
 
@@ -57,9 +57,9 @@ describe("JWT-bearer session start", () => {
   test("stores the session (client, user, signed out) and binds the token to the proof's key", async () => {
     const { post, tb, dpop } = await setup();
     const { json } = await post();
-    const s = tb.company.stores.sessions.get(json.session_id as string)!;
+    const s = (await tb.company.stores.sessions.get(json.session_id as string))!;
     expect(s).toMatchObject({ clientId: tb.agent.clientId, userId: USER, accountId: null, ended: false });
-    const t = tb.company.stores.tokens.get(json.access_token as string)!;
+    const t = (await tb.company.stores.tokens.get(json.access_token as string))!;
     expect(t).toMatchObject({ sessionId: s.id, jkt: await jwkThumbprint(dpop.publicJwk), accountId: null, scope: [] });
     expect(t.expiresAt - Date.now()).toBeGreaterThan(3590_000);
   });
@@ -259,7 +259,7 @@ describe("session renewal (S4 G1)", () => {
     const { post, tb } = await setup();
     expectError(await post({ form: { session_id: "ses_nope" } }), 400, "invalid_session");
     const first = (await post()).json;
-    tb.company.stores.sessions.get(first.session_id as string)!.ended = true;
+    await edit(tb.company.stores.sessions, first.session_id as string, (x) => { x.ended = true; });
     expectError(await post({ form: { session_id: first.session_id as string } }), 400, "invalid_session");
   });
 

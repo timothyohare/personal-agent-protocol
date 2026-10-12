@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { clientAssertion, dpopProof, jwkThumbprint, newDpopKey, pkceChallenge, pkceVerifier, type DpopKey } from "poppy-core";
 import { MemoryVault } from "agent";
 import { CLIENT_ASSERTION_TYPE } from "../src/index.ts";
-import { COMPANY, TOKEN_EP, testbed } from "../../../test-support/testbed.ts";
+import { COMPANY, TOKEN_EP, edit, testbed } from "../../../test-support/testbed.ts";
 import { TestBrowser, userSignsIn } from "../../../test-support/browser.ts";
 import { signInFlow } from "../../../test-support/signin.ts";
 
@@ -48,7 +48,7 @@ describe("authorization_code grant", () => {
     const { exchange, newCode, tb } = await setup();
     const k = await newDpopKey();
     const r = await exchange({ code: await newCode() }, { dpop: k });
-    expect(tb.company.stores.tokens.get(r.json.access_token as string)!.jkt).toBe(await jwkThumbprint(k.publicJwk));
+    expect((await tb.company.stores.tokens.get(r.json.access_token as string))!.jkt).toBe(await jwkThumbprint(k.publicJwk));
   });
 
   test("A-12: a code works once only; the first sign-in stays valid", async () => {
@@ -57,7 +57,7 @@ describe("authorization_code grant", () => {
     const first = await exchange({ code });
     expect(first.status).toBe(200);
     expect((await exchange({ code })).json.error).toBe("invalid_grant");
-    expect(tb.company.stores.tokens.get(first.json.access_token as string)).toBeDefined();
+    expect((await tb.company.stores.tokens.get(first.json.access_token as string))).toBeDefined();
   });
 
   test("A-13: the wrong PKCE verifier (and the code is burned)", async () => {
@@ -73,7 +73,7 @@ describe("authorization_code grant", () => {
     expect((await exchange({ code: await newCode(), redirect_uri: "https://agent.example/other" })).json.error).toBe("invalid_grant");
     expect((await exchange({ code: "nope" })).json.error).toBe("invalid_grant");
     const code = await newCode();
-    tb.company.stores.codes.get(code)!.expiresAt = Date.now() - 1;
+    await edit(tb.company.stores.codes, code, (c) => { c.expiresAt = Date.now() - 1; });
     expect((await exchange({ code })).json.error).toBe("invalid_grant");
   });
 
@@ -111,7 +111,7 @@ describe("authorization_code grant", () => {
     const { tb, client } = await setup();
     await signInFlow(client, tb.fetch);
     const { makeUser } = await import("../src/index.ts");
-    tb.company.stores.users.set("other", makeUser("other", "pw-other"));
+    await tb.company.stores.users.put("other", makeUser("other", "pw-other"));
     const url = await client.beginSignIn(["poppy:read"]);
     const cb = await userSignsIn(new TestBrowser(tb.fetch), url, { username: "other", password: "pw-other" });
     await expect(client.completeSignIn(cb)).rejects.toMatchObject({ code: "account_mismatch", status: 400 });

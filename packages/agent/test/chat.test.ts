@@ -32,7 +32,7 @@ async function setup(script: Step[], o: { inject?: string } = {}) {
   const graph = buildChatGraph({ model, toolDeps: { agent, signIn }, companies: [COMPANY_HOST] });
   const asked: ConfirmRequest[] = [];
   const turn = (text: string, answer = true) => chatTurn(graph, "t1", text, async (r) => { asked.push(r); return answer; });
-  const tips = () => [...(tb.company.stores.tips.get("acct_tipper")?.values() ?? [])];
+  const tips = () => tb.company.stores.tips.list("acct_tipper");
   return { tb, agent, vault, model, graph, asked, turn, tips, signIns: () => signIns };
 }
 
@@ -58,7 +58,7 @@ describe("chat agent (milestone 6)", () => {
     expect(s.asked).toHaveLength(1);
     expect(s.asked[0]!.question).toBe(`Allow POST /api/me/tips at ${COMPANY_HOST} with {"fixture_id":"r27-1","team":"Storm"}?`);
     expect(s.signIns()).toBe(1);
-    expect(s.tips().map((t) => t.team)).toEqual(["Storm"]);
+    expect((await s.tips()).map((t) => t.team)).toEqual(["Storm"]);
   });
 
   test("answering no sends nothing, and the model is told the user declined", async () => {
@@ -67,7 +67,7 @@ describe("chat agent (milestone 6)", () => {
     s.asked.length = 0;
     const out = await chatTurn(s.graph, "t2", "Tip the Storm", async () => false);
     expect(out).toBe("result: declined_by_user");
-    expect(s.tips()).toEqual([]);
+    expect(await s.tips()).toEqual([]);
     expect(s.signIns()).toBe(0);
   });
 
@@ -81,7 +81,7 @@ describe("chat agent (milestone 6)", () => {
     const out = await chatTurn(s.graph, "t3", "What are the fixtures?", async (r) => { s.asked.push(r); return false; });
     expect(s.asked.map((a) => a.call.method)).toEqual(["POST"]);
     expect(out).toBe("result: declined_by_user");
-    expect(s.tips()).toEqual([]);
+    expect(await s.tips()).toEqual([]);
     // The injected text did reach the model, as data inside a tool result.
     expect(JSON.stringify(s.model.seen.at(-2))).toContain(injection);
   });
@@ -95,7 +95,7 @@ describe("chat agent (milestone 6)", () => {
       (await s.vault.get("dpop_key:https://tipping.example"))!];
     const everything = JSON.stringify(s.model.seen) + JSON.stringify((await s.graph.getState({ configurable: { thread_id: "t1" } })).values);
     expect(leaks(everything, secrets)).toEqual([]);
-    expect(s.tips().map((t) => t.team)).toEqual(["Sharks"]);
+    expect((await s.tips()).map((t) => t.team)).toEqual(["Sharks"]);
   });
 
   test("the system prompt marks API content as untrusted and lists the companies", () => {

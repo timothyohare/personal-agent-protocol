@@ -48,7 +48,7 @@ describe("signed in", () => {
     const { tb, client } = await signedIn();
     await client.call("POST", "/api/me/tips", { fixture_id: "r27-1", team: "Storm" });
     const { makeUser } = await import("../src/index.ts");
-    tb.company.stores.users.set("other", makeUser("other", "pw"));
+    await tb.company.stores.users.put("other", makeUser("other", "pw"));
     const c2 = tb.client(new MemoryVault());
     await signInFlow(c2, tb.fetch, { username: "other", password: "pw" });
     expect((await c2.call("GET", "/api/me/tips")).body).toEqual({ tips: [] });
@@ -70,8 +70,8 @@ describe("signed in", () => {
     const { client, tb } = await signedIn();
     const renewed = await client.startSession({ renew: true });
     const { currentAuth } = await import("../src/index.ts");
-    const st = tb.company.stores.tokens.get(renewed.token)!;
-    expect(currentAuth(st, tb.company.stores.sessions.get(st.sessionId)!).signedIn).toBe(false);
+    const st = (await tb.company.stores.tokens.get(renewed.token))!;
+    expect(currentAuth(st, (await tb.company.stores.sessions.get(st.sessionId))!).signedIn).toBe(false);
     expect((await client.call("GET", "/api/me/tips")).status).toBe(200);
     expect(client.session!.signedIn).toBe(true);
     expect(client.session!.sessionId).toBe(renewed.sessionId);

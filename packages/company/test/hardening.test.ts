@@ -126,7 +126,7 @@ describe("code and refresh grants: exact errors and boundaries", () => {
 
   test("a code expires exactly at its expiry time", async () => {
     const { tb, form, code } = await withCode();
-    vi.spyOn(Date, "now").mockReturnValue(tb.company.stores.codes.get(code)!.expiresAt);
+    vi.spyOn(Date, "now").mockReturnValue((await tb.company.stores.codes.get(code))!.expiresAt);
     expect((await post(tb, TOKEN_EP, form)).json.error).toBe("invalid_grant");
   });
 
@@ -135,7 +135,7 @@ describe("code and refresh grants: exact errors and boundaries", () => {
     const client = tb.client(new MemoryVault());
     await signInFlow(client, tb.fetch, { scopes: ["poppy:read", "standings"] });
     const at = (await client.accountToken())!.token;
-    expect(tb.company.stores.accountTokens.get(at)!.id).toMatch(/^at_[A-Za-z0-9_-]{22}$/);
+    expect((await tb.company.stores.accountTokens.get(at))!.id).toMatch(/^at_[A-Za-z0-9_-]{22}$/);
     const refresh = (extra: Record<string, string> = {}, who = tb.agent) =>
       post(tb, TOKEN_EP, { grant_type: "refresh_token", refresh_token: at, ...extra }, { who });
     expect((await refresh({ scope: "poppy:read  standings" })).json).toMatchObject({ scope: "poppy:read standings" });
@@ -187,7 +187,7 @@ describe("revocation details", () => {
     const second = one.tb.client(new MemoryVault());
     const s2 = (await signInFlow(second, one.tb.fetch)).session;
     await post(one.tb, revokeUrl, { token: one.at }, { proof: false });
-    expect(one.tb.company.stores.sessions.get(s2.sessionId)!.accountTokenId).not.toBeNull();
+    expect((await one.tb.company.stores.sessions.get(s2.sessionId))!.accountTokenId).not.toBeNull();
     expect((await second.call("GET", "/api/me/tips")).status).toBe(200);
   });
 
@@ -195,7 +195,7 @@ describe("revocation details", () => {
     const { tb, session } = await signedIn();
     const other = await tb.addAgent("o.example");
     expect((await post(tb, revokeUrl, { token: session.token }, { proof: false, who: other })).status).toBe(200);
-    expect(tb.company.stores.tokens.has(session.token)).toBe(true);
+    expect(((await tb.company.stores.tokens.get(session.token)) !== undefined)).toBe(true);
     expect((await post(tb, revokeUrl, { token: "unknown" }, { proof: false })).status).toBe(200);
   });
 
@@ -205,9 +205,9 @@ describe("revocation details", () => {
     const again = (await signInFlow(client, tb.fetch)).session;
     expect(again.sessionId).toBe(session.sessionId);
     const { currentAuth } = await import("../src/index.ts");
-    const old = tb.company.stores.tokens.get(session.token)!;
-    expect(currentAuth(old, tb.company.stores.sessions.get(old.sessionId)!).signedIn).toBe(false);
-    expect(currentAuth(tb.company.stores.tokens.get(again.token)!, tb.company.stores.sessions.get(again.sessionId)!).signedIn)
+    const old = (await tb.company.stores.tokens.get(session.token))!;
+    expect(currentAuth(old, (await tb.company.stores.sessions.get(old.sessionId))!).signedIn).toBe(false);
+    expect(currentAuth((await tb.company.stores.tokens.get(again.token))!, (await tb.company.stores.sessions.get(again.sessionId))!).signedIn)
       .toBe(true);
   });
 });
@@ -254,7 +254,7 @@ describe("API middleware details", () => {
 
   test("a token expires exactly at its expiry time, with its reason", async () => {
     const { get, s, tb } = await session();
-    vi.spyOn(Date, "now").mockReturnValue(tb.company.stores.tokens.get(s.token)!.expiresAt);
+    vi.spyOn(Date, "now").mockReturnValue((await tb.company.stores.tokens.get(s.token))!.expiresAt);
     expect((await get(`DPoP ${s.token}`)).json).toEqual({ error: "invalid_token", error_description: "unknown, expired or ended token" });
   });
 
@@ -318,7 +318,8 @@ describe("authorize details", () => {
     const tb = await testbed();
     const r = await new TestBrowser(tb.fetch).get(authz(tb, { scope: " poppy:read  poppy:read standings " }));
     expect(r.status).toBe(200);
-    expect(tb.company.stores.pending.values().next().value!.scope).toEqual(["poppy:read", "standings"]);
+    const req = parseForm(await r.text()).hidden.req!;
+    expect((await tb.company.stores.pending.get(req))!.scope).toEqual(["poppy:read", "standings"]);
   });
 
   test("pages send no-referrer and nosniff; the cookie is HttpOnly, Lax, /oauth and Secure over https", async () => {
@@ -348,7 +349,7 @@ describe("authorize details", () => {
       expect(r.status).toBe(400);
       expect(await r.text()).toContain("This sign-in request has expired.");
     }
-    vi.spyOn(Date, "now").mockReturnValue(tb.company.stores.pending.get(f.hidden.req!)!.expiresAt);
+    vi.spyOn(Date, "now").mockReturnValue((await tb.company.stores.pending.get(f.hidden.req!))!.expiresAt);
     const expired = await b.post(`${COMPANY}/oauth/authorize/login`, fields(f.hidden.req!));
     expect(await expired.text()).toContain("This sign-in request has expired.");
   });

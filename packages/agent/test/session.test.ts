@@ -14,9 +14,9 @@ describe("CompanyClient.startSession", () => {
     const s = await c.startSession();
     expect(s).toMatchObject({ signedIn: false, scope: [] });
     expect(s.sessionId).toMatch(/^ses_/);
-    const stored = tb.company.stores.tokens.get(s.token)!;
+    const stored = (await tb.company.stores.tokens.get(s.token))!;
     expect(stored.jkt).toBe(await jwkThumbprint((await dpopKeyFor(vault, COMPANY)).publicJwk));
-    expect(tb.company.stores.sessions.get(s.sessionId)!.userId).toBe(await userIdFor(vault, COMPANY));
+    expect((await tb.company.stores.sessions.get(s.sessionId))!.userId).toBe(await userIdFor(vault, COMPANY));
   });
 
   test("renews the same Session with its session_id", async () => {

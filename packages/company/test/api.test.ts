@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { dpopProof, newDpopKey, type DpopKey } from "poppy-core";
 import { MemoryVault, dpopKeyFor } from "agent";
-import { COMPANY, testbed } from "../../../test-support/testbed.ts";
+import { COMPANY, edit, testbed } from "../../../test-support/testbed.ts";
 
 const FIX = `${COMPANY}/api/fixtures`;
 
@@ -135,10 +135,10 @@ describe("rejections (F5): 401 with WWW-Authenticate: DPoP", () => {
 
   test("an expired token, or an ended Session", async () => {
     const { get, s, tb } = await setup();
-    tb.company.stores.tokens.get(s.token)!.expiresAt = Date.now() - 1;
+    await edit(tb.company.stores.tokens, s.token, (t) => { t.expiresAt = Date.now() - 1; });
     expectAuthError(await get(FIX), 401, "invalid_token");
     const two = await setup();
-    two.tb.company.stores.sessions.get(two.s.sessionId)!.ended = true;
+    await edit(two.tb.company.stores.sessions, two.s.sessionId, (x) => { x.ended = true; });
     expectAuthError(await two.get(FIX), 401, "invalid_token");
   });
 
@@ -176,7 +176,7 @@ describe("DPoP nonces at APIs", () => {
 describe("agent call()", () => {
   test("starts a new Session after invalid_token and retries", async () => {
     const { client, tb, s } = await setup();
-    tb.company.stores.tokens.delete(s.token);
+    await tb.company.stores.tokens.delete(s.token);
     const r = await client.call("GET", "/api/ladder");
     expect(r.status).toBe(200);
     expect(client.session!.sessionId).not.toBe(s.sessionId);

@@ -15,9 +15,8 @@ export function signIn(session: Session, at: AccountToken): void {
 
 export function authorizationCodeGrant(d: TokenDeps): GrantHandler {
   return async ({ form, clientId, jkt }) => {
-    const code = d.stores.codes.get(form.code ?? "");
-    // Single use: removed on first presentation, whatever happens next (A-12).
-    if (code) d.stores.codes.delete(code.code);
+    // Single use: taken (read and deleted in one step) on first presentation, whatever happens next (A-12, A-40).
+    const code = await d.stores.codes.take(form.code ?? "");
     if (!code || code.expiresAt <= Date.now()) throw oauthError("invalid_grant", 400, "unknown, used or expired code");
     if (code.clientId !== clientId) throw oauthError("invalid_grant", 400, "code was issued to another client");
     if (form.redirect_uri !== code.redirectUri) throw oauthError("invalid_grant", 400, "redirect_uri mismatch");
@@ -25,16 +24,17 @@ export function authorizationCodeGrant(d: TokenDeps): GrantHandler {
       throw oauthError("invalid_grant", 400, "PKCE verification failed");
     }
     if (!form.session_id) throw oauthError("invalid_request", 400, "session_id required");
-    const session = ownedSession(d.stores, form.session_id, clientId);
+    const session = await ownedSession(d.stores, form.session_id, clientId);
 
     const at: AccountToken = { id: `at_${rid()}`, token: rid(32), clientId, userId: session.userId,
       accountId: code.accountId, scope: code.scope };
     signIn(session, at);
-    d.stores.accountTokens.set(at.token, at);
+    await d.stores.accountTokens.put(at.token, at);
+    await d.stores.sessions.put(session.id, session);
     d.c.log.event("session.signed_in", { session_id: session.id, client_id: clientId, account: at.accountId,
       scope: at.scope.join(" ") });
     // The new Session Token is bound to the key in this request's proof (spec 4.3, S4 E1).
-    return { ...issueSessionToken(d, session, jkt, at.scope), refresh_token: at.token };
+    return { ...await issueSessionToken(d, session, jkt, at.scope), refresh_token: at.token };
   };
 }
 
@@ -45,7 +45,7 @@ export function authorizationCodeGrant(d: TokenDeps): GrantHandler {
  */
 export function refreshTokenGrant(d: TokenDeps): GrantHandler {
   return async ({ form, clientId, jkt }) => {
-    const at = d.stores.accountTokens.get(form.refresh_token ?? "");
+    const at = await d.stores.accountTokens.get(form.refresh_token ?? "");
     // Revocation deletes the Account Token, so an unknown token covers revoked ones too.
     if (!at) throw oauthError("invalid_grant", 400, "unknown or revoked Account Token");
     // A stolen Account Token is useless with another agent's client assertion (A-20).
@@ -63,18 +63,18 @@ export function refreshTokenGrant(d: TokenDeps): GrantHandler {
 
     let session: Session;
     if (form.session_id !== undefined) {
-      session = ownedSession(d.stores, form.session_id, clientId, at.userId);
+      session = await ownedSession(d.stores, form.session_id, clientId, at.userId);
       signIn(session, at);
     } else {
       session = { id: newSessionId(), clientId, userId: at.userId, accountId: at.accountId, accountTokenId: at.id,
         ended: false, createdAt: Date.now() };
-      d.stores.sessions.set(session.id, session);
     }
-    const body: Record<string, unknown> = issueSessionToken(d, session, jkt, scope);
+    await d.stores.sessions.put(session.id, session);
+    const body: Record<string, unknown> = await issueSessionToken(d, session, jkt, scope);
     if (d.c.rotateAccountTokens) {
-      d.stores.accountTokens.delete(at.token);
+      await d.stores.accountTokens.delete(at.token);
       at.token = rid(32);
-      d.stores.accountTokens.set(at.token, at);
+      await d.stores.accountTokens.put(at.token, at);
       body.refresh_token = at.token;
     }
     d.c.log.event("session.refreshed", { session_id: session.id, client_id: clientId, account: at.accountId,

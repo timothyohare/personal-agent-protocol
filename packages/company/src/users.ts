@@ -20,8 +20,7 @@ export function makeUser(username: string, password: string, accountId = `acct_$
 }
 
 /** Constant-time password check. Unknown users still pay for a hash. */
-export function checkPassword(users: Map<string, User>, username: string, password: string): User | undefined {
-  const u = users.get(username);
+export function checkPassword(u: User | undefined, password: string): User | undefined {
   const salt = u ? Buffer.from(u.salt, "base64url") : Buffer.alloc(16);
   const got = scryptSync(password, salt, 32);
   const want = u ? Buffer.from(u.hash, "base64url") : Buffer.alloc(32, 1);

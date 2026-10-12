@@ -46,8 +46,8 @@ export function requireSessionToken(c: ResolvedConfig, stores: Stores, nonces: N
     const m = header.match(/^DPoP\s+([A-Za-z0-9._~+/-]+=*)$/i);
     if (!m) return authError(ctx, 401, "invalid_token", "DPoP Session Token required in the Authorization header");
     const value = m[1]!;
-    const token = stores.tokens.get(value);
-    const session = token ? stores.sessions.get(token.sessionId) : undefined;
+    const token = await stores.tokens.get(value);
+    const session = token ? await stores.sessions.get(token.sessionId) : undefined;
     if (!token || !session || token.expiresAt <= Date.now() || session.ended || token.resource !== undefined) {
       return authError(ctx, 401, "invalid_token", "unknown, expired or ended token");
     }

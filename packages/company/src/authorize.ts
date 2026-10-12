@@ -59,8 +59,8 @@ export function authorizeRoutes(d: AuthorizeDeps): Hono {
     return ctx.redirect(u.toString(), 303);
   };
 
-  const pendingFor = (ctx: Context, form: Record<string, string>): PendingAuthz | string => {
-    const p = stores.pending.get(form.req ?? "");
+  const pendingFor = async (ctx: Context, form: Record<string, string>): Promise<PendingAuthz | string> => {
+    const p = await stores.pending.get(form.req ?? "");
     if (!p || p.expiresAt <= Date.now()) return "This sign-in request has expired. Start again from your agent.";
     // CSRF (T-9): the form must carry this request's token, from the browser that started it.
     if (form.csrf !== p.csrf || getCookie(ctx, COOKIE) !== p.id) return "csrf";
@@ -113,7 +113,7 @@ export function authorizeRoutes(d: AuthorizeDeps): Hono {
       redirectUri: q.redirect_uri, state: q.state, codeChallenge: q.code_challenge, scope: [...new Set(scope)],
       accountId: null, username: null, expiresAt: Date.now() + PENDING_TTL_MS,
     };
-    stores.pending.set(p.id, p);
+    await stores.pending.put(p.id, p, p.expiresAt);
     setCookie(ctx, COOKIE, p.id, { httpOnly: true, sameSite: "Lax", path: "/oauth", secure: c.issuer.startsWith("https:") });
     c.log.event("authorize.started", { client_id: q.client_id, scope: p.scope.join(" ") });
     return html(ctx, loginPage({ company: c.name, clientName: p.clientName, clientHost: new URL(p.clientId).host,
@@ -122,19 +122,20 @@ export function authorizeRoutes(d: AuthorizeDeps): Hono {
 
   app.post("/oauth/authorize/login", async (ctx) => {
     const { form } = await formOf(ctx);
-    const p = pendingFor(ctx, form);
+    const p = await pendingFor(ctx, form);
     if (p === "csrf") return fail(ctx, "The form is invalid (CSRF check failed).", 403);
     if (typeof p === "string") return fail(ctx, p);
     const page = (error: string) => html(ctx, loginPage({ company: c.name, clientName: p.clientName,
       clientHost: new URL(p.clientId).host, reqId: p.id, csrf: p.csrf, error }), 401);
     if (d.loginLimiter.hit(`login:${p.id}`) > 0) return page("Too many attempts. Wait a minute and try again.");
-    const user = checkPassword(stores.users, form.username ?? "", form.password ?? "");
+    const user = checkPassword(await stores.users.get(form.username ?? ""), form.password ?? "");
     if (!user) {
       c.log.event("login.failed", { client_id: p.clientId });
       return page("Wrong username or password.");
     }
     p.accountId = user.accountId;
     p.username = user.username;
+    await stores.pending.put(p.id, p, p.expiresAt);
     c.log.event("login.ok", { account: user.accountId });
     return html(ctx, consentPage({ company: c.name, clientName: p.clientName, clientHost: new URL(p.clientId).host,
       reqId: p.id, csrf: p.csrf, username: user.username,
@@ -143,11 +144,11 @@ export function authorizeRoutes(d: AuthorizeDeps): Hono {
 
   app.post("/oauth/authorize/consent", async (ctx) => {
     const { form, scopes } = await formOf(ctx);
-    const p = pendingFor(ctx, form);
+    const p = await pendingFor(ctx, form);
     if (p === "csrf") return fail(ctx, "The form is invalid (CSRF check failed).", 403);
     if (typeof p === "string") return fail(ctx, p);
     if (!p.accountId) return fail(ctx, "Sign in first.");
-    stores.pending.delete(p.id);
+    await stores.pending.delete(p.id);
     // Never grant beyond what was requested (spec 4.4, T-17).
     const granted = p.scope.filter((s) => scopes.includes(s));
     if (form.decision !== "approve" || granted.length === 0) {
@@ -155,8 +156,9 @@ export function authorizeRoutes(d: AuthorizeDeps): Hono {
       return errorRedirect(ctx, p.redirectUri, "access_denied", p.state);
     }
     const code = rid(32);
-    stores.codes.set(code, { code, clientId: p.clientId, redirectUri: p.redirectUri, codeChallenge: p.codeChallenge,
-      scope: granted, accountId: p.accountId, expiresAt: Date.now() + CODE_TTL_MS });
+    const expiresAt = Date.now() + CODE_TTL_MS;
+    await stores.codes.put(code, { code, clientId: p.clientId, redirectUri: p.redirectUri, codeChallenge: p.codeChallenge,
+      scope: granted, accountId: p.accountId, expiresAt }, expiresAt);
     c.log.event("consent.granted", { client_id: p.clientId, scope: granted.join(" ") });
     const u = new URL(p.redirectUri);
     u.searchParams.set("code", code);
