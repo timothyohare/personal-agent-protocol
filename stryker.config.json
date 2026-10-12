@@ -7,7 +7,8 @@
   "mutate": [
     "packages/poppy-core/src/**/*.ts",
     "!packages/poppy-core/src/index.ts",
-    "!packages/poppy-core/src/fetchRouter.ts"
+    "!packages/poppy-core/src/fetchRouter.ts",
+    "packages/company/src/{middleware,token,authorize,grants,revoke,verifyAgent}.ts"
   ],
   "concurrency": 2,
   "reporters": [
@@ -23,5 +24,6 @@
     "low": 80,
     "break": 80
   },
-  "tempDirName": ".stryker-tmp"
+  "tempDirName": ".stryker-tmp",
+  "timeoutMS": 20000
 }

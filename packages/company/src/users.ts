@@ -10,6 +10,8 @@ export interface User {
 }
 
 export const DEFAULT_TEST_USER = { username: "tipper", password: "correct horse battery staple" };
+/** A second account, for account_mismatch tests (A-43). */
+export const SECOND_TEST_USER = { username: "rival", password: "battery staple horse correct" };
 
 export function makeUser(username: string, password: string, accountId = `acct_${username}`): User {
   const salt = randomBytes(16);

@@ -52,8 +52,8 @@ async function guardUrl(url: string, c: ResolvedConfig): Promise<URL> {
   if (!isAllowedUrl(url, c.devAllowHttpLocalhost)) throw invalidClient(`not an allowed URL: ${url}`);
   const u = new URL(url);
   const hostname = u.hostname.replace(/^\[|\]$/g, "");
-  // The dev exception covers localhost only, and only when the flag is set.
-  if (c.devAllowHttpLocalhost && isLocalHostname(u.hostname)) return u;
+  // The dev exception covers http://localhost only, and only when the flag is set.
+  if (c.devAllowHttpLocalhost && u.protocol === "http:" && isLocalHostname(u.hostname)) return u;
   const addrs = isIP(hostname) ? [hostname] : await (c.resolveHost ?? defaultResolve)(hostname).catch(() => []);
   if (addrs.length === 0) throw invalidClient(`cannot resolve ${hostname}`);
   if (addrs.some(isBlockedAddress)) throw invalidClient(`${hostname} resolves to a blocked address`);

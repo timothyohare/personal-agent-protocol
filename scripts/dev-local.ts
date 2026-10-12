@@ -14,3 +14,6 @@ const { publicJwk, created } = await generateAgentKeys(keysDir());
 if (created) console.log(`[dev-local] generated agent signing key kid=${publicJwk.kid}`);
 startCompany({ port: 8787 });
 startAgentHost({ port: 8788, publicJwk });
+// A second, hostile agent for the attack suite (npm run attacks).
+const attacker = await generateAgentKeys(keysDir(), false, "attacker");
+startAgentHost({ port: 8789, publicJwk: attacker.publicJwk, clientName: "Mallory's Agent" });

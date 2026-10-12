@@ -5,7 +5,7 @@
   "build": "npm run build",
   "boot": "npm run dev:local",
   "ready": "http://localhost:8788/agent.json",
-  "acceptance": "npm run acceptance",
+  "acceptance": "npm run acceptance && npm run attacks",
   "mutation": "npm run mutation",
   "observability": "node scripts/check-logs.ts",
   "env": {
