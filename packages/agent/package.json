@@ -15,7 +15,7 @@
     "@langchain/langgraph": "1.4.18",
     "jose": "6.2.12",
     "poppy-core": "0.1.0",
-    "zod": "4.6.5"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "agent-host": "0.1.0",
