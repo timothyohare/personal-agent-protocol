@@ -11,7 +11,7 @@
     "test": "vitest run --root ../.. --project company"
   },
   "dependencies": {
-    "@hono/node-server": "2.1.1",
+    "@hono/node-server": "2.1.6",
     "hono": "4.13.9",
     "jose": "6.2.12",
     "poppy-core": "0.1.0"
